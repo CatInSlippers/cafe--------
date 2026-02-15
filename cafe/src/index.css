@@ -1,0 +1,11 @@
+/* ./src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --day-pink: #E6CECE;
+    --day-purple: #D1CCF4;
+    --night-dark-blue: #40457D;
+    --night-dark-purple: #0B0D47;
+}

@@ -1,0 +1,27 @@
+{
+  "name": "cafe",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "konva": "^10.0.12",
+    "nodemailer": "^7.0.12",
+    "nodemon": "^3.1.11",
+    "pg": "^8.16.3",
+    "react-konva": "^19.2.1",
+    "react-router-dom": "^7.11.0"
+  }
+}
