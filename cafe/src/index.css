@@ -3,9 +3,17 @@
 @tailwind components;
 @tailwind utilities;
 
+
 :root {
+    --bg-color: white;
+    --text-color: black;
     --day-pink: #E6CECE;
     --day-purple: #D1CCF4;
     --night-dark-blue: #40457D;
     --night-dark-purple: #0B0D47;
+}
+
+.dark body {
+    background-color: var(--night-dark-purple);
+    color: white;
 }

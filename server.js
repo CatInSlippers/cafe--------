@@ -4,6 +4,29 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// 1. Створюємо папку uploads, якщо її немає
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+// 2. Налаштовуємо сховище для картинок
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/'); // Папка, куди зберігатимуться файли
+    },
+    filename: function (req, file, cb) {
+        // Робимо унікальне ім'я файлу (дата + оригінальне розширення)
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -13,6 +36,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Налаштування з'єднання з БД
 const pool = new Pool({
@@ -62,7 +87,8 @@ app.post('/register', async (req, res) => {
             user: {
                 id: newUser.rows[0].user_id,
                 name: newUser.rows[0].full_name,
-                email: newUser.rows[0].email
+                email: newUser.rows[0].email,
+                phone: newUser.rows[0].phone
             }
         });
 
@@ -105,11 +131,12 @@ app.post('/login', async (req, res) => {
         // 4. Відправляємо успішну відповідь
         // Frontend очікує: { message, user_id, role, name }
         res.json({
-            message: "Вхід успішний!",
             user_id: user.user_id,
-            name: user.full_name, // Мапимо full_name з БД на name для фронтенду
+            name: user.full_name,
             role: user.role,
-            email: user.email
+            email: user.email,
+            avatar: user.avatar,
+            phone: user.phone
         });
 
     } catch (err) {
@@ -294,7 +321,7 @@ app.get('/api/user/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "SELECT user_id, full_name, email, phone, role, balance, created_at FROM users WHERE user_id = $1",
+            "SELECT user_id, full_name, email, phone, role, balance, created_at, avatar FROM users WHERE user_id = $1",
             [id]
         );
 
@@ -306,6 +333,133 @@ app.get('/api/user/:id', async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server Error");
+    }
+});
+
+// ==========================================
+// МАРШРУТ ОНОВЛЕННЯ ПРОФІЛЮ КОРИСТУВАЧА (PUT)
+// ==========================================
+app.put('/api/user/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, phone, currentPassword, newPassword } = req.body;
+
+    try {
+        // 1. Знаходимо користувача в БД
+        const userResult = await pool.query("SELECT * FROM users WHERE user_id = $1", [id]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: "Користувача не знайдено" });
+        }
+
+        const user = userResult.rows[0];
+
+        // 2. Готуємо змінні для SQL запиту (за замовчуванням залишаємо старі дані, якщо нові не прийшли)
+        let query = "UPDATE users SET full_name = $1, phone = $2";
+        let values = [name || user.full_name, phone || user.phone];
+        let valueIndex = 3;
+
+        // 3. Логіка зміни пароля
+        if (currentPassword && newPassword) {
+            // Перевіряємо, чи збігається введений "поточний пароль" з тим, що в базі
+            const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+
+            if (!validPassword) {
+                // Якщо пароль невірний, одразу перериваємо виконання і повертаємо помилку
+                return res.status(401).json({ error: "Невірний поточний пароль!" });
+            }
+
+            // Якщо все ок — хешуємо новий пароль
+            const salt = await bcrypt.genSalt(10);
+            const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+            // Додаємо оновлення пароля до нашого SQL запиту
+            query += `, password_hash = $${valueIndex}`;
+            values.push(hashedNewPassword);
+            valueIndex++;
+        }
+
+        // 4. Завершуємо формування запиту
+        query += ` WHERE user_id = $${valueIndex} RETURNING user_id, full_name, email, phone, role`;
+        values.push(id);
+
+        // 5. Виконуємо запит до БД
+        const updatedUser = await pool.query(query, values);
+
+        res.json({
+            message: "Профіль успішно оновлено!",
+            user: {
+                id: updatedUser.rows[0].user_id,
+                name: updatedUser.rows[0].full_name,
+                email: updatedUser.rows[0].email,
+                phone: updatedUser.rows[0].phone,
+                role: updatedUser.rows[0].role
+            }
+        });
+
+    } catch (err) {
+        console.error("Помилка оновлення профілю:", err.message);
+        res.status(500).json({ error: "Помилка сервера при оновленні" });
+    }
+});
+
+// ==========================================
+// МАРШРУТ ВИДАЛЕННЯ АКАУНТА (DELETE)
+// ==========================================
+app.delete('/api/user/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Видаляємо користувача з бази даних
+        const result = await pool.query(
+            "DELETE FROM users WHERE user_id = $1 RETURNING *",
+            [id]
+        );
+
+        // Якщо користувача з таким ID не було в базі
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Користувача не знайдено" });
+        }
+
+        res.json({ message: "Акаунт успішно видалено" });
+
+    } catch (err) {
+        console.error("Помилка видалення акаунта:", err.message);
+        res.status(500).json({ error: "Помилка сервера при видаленні акаунта" });
+    }
+});
+
+// ==========================================
+// МАРШРУТ ЗАВАНТАЖЕННЯ АВАТАРА (POST)
+// ==========================================
+app.post('/api/user/:id/avatar', upload.single('avatar'), async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "Файл не завантажено" });
+        }
+
+        // Формуємо шлях до файлу (наприклад: /uploads/1678901234.jpg)
+        const avatarUrl = `/uploads/${req.file.filename}`;
+
+        // Оновлюємо посилання в базі даних
+        const result = await pool.query(
+            "UPDATE users SET avatar = $1 WHERE user_id = $2 RETURNING avatar",
+            [avatarUrl, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Користувача не знайдено" });
+        }
+
+        res.json({
+            message: "Аватар успішно оновлено!",
+            avatarUrl: avatarUrl
+        });
+
+    } catch (err) {
+        console.error("Помилка завантаження аватара:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
     }
 });
 

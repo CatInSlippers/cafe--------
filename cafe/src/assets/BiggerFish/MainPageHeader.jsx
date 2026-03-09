@@ -1,8 +1,8 @@
-import {Logo} from "../Blocks/Logo";
-import {SearchBar} from "../Blocks/SearchBar";
-import {Greeting} from "../Blocks/Greeting";
+import { Logo } from "../Blocks/Logo";
+import { SearchBar } from "../Blocks/SearchBar";
+import { Greeting } from "../Blocks/Greeting";
 import UserLoggedIconClick from "../Blocks/UserLoggedIconClick";
-function MainPageHeader(user, setIsOpen, isOpen, navigate, setIsSettingsOpen, handleLogout) {
+function MainPageHeader({ user, setIsOpen, setUser, isOpen, navigate, isSettingsOpen, setIsSettingsOpen, handleLogout }) {
     return <header className="bg-white dark:bg-black shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <Logo />
@@ -11,14 +11,19 @@ function MainPageHeader(user, setIsOpen, isOpen, navigate, setIsSettingsOpen, ha
             {user
                 ?
                 <div className="flex items-center gap-3">
-                    <Greeting />
+                    <Greeting
+                        user={user}
+                    />
                     <UserLoggedIconClick
                         user={user}
-                        setIsOpen={setIsOpen}
+                        setUser={setUser}
                         isOpen={isOpen}
-                        navigate={navigate}
+                        setIsOpen={setIsOpen}
+                        isSettingsOpen={isSettingsOpen}
                         setIsSettingsOpen={setIsSettingsOpen}
-                        handleLogout={handleLogout} />
+                        navigate={navigate}
+                        handleLogout={handleLogout}
+                    />
                 </div>
                 :
                 <button onClick={() => navigate('/login')} className="text-sm font-bold text-[var(--day-purple)] dark:text-[var(--night-dark-blue)] hover:underline">Увійти</button>}
