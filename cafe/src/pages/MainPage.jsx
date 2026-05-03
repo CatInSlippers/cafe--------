@@ -1,248 +1,291 @@
-import React from "react";
-import { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainPageHeader from "../assets/BiggerFish/MainPageHeader";
-import { FiCheckCircle, FiCircle, FiClock, FiMapPin, FiCalendar } from "react-icons/fi";
+import { FiCheckCircle, FiCircle, FiMapPin, FiCalendar, FiUser, FiUsers, FiCoffee, FiMonitor, FiBriefcase, FiClock } from "react-icons/fi";
 import axios from 'axios';
 
-// --- Фейкові дані (поки немає бекенду для цього) ---
-export const CATEGORIES = [
-    { id: 'desk', label: 'Робочі місця' },
-    { id: 'meeting', label: 'Переговорні кімнати' },
-    { id: 'office', label: 'Приватні офіси' },
-    { id: 'lounge', label: 'Лаунж зона' },
+// 1. Словник типів місць (відповідає типам фігур на карті)
+const SPACE_TYPES = [
+    { id: 'desk', title: 'Робоче місце (Стіл)', icon: <FiUser className="text-2xl" />, description: 'Індивідуальне робоче місце. Доступ до розетки та швидкісного Wi-Fi.', basePrice: 50 },
+    { id: 'meeting_table', title: 'Переговорний стіл', icon: <FiUsers className="text-2xl" />, description: 'Простір для команди. Ідеально для мітів та колаборацій.', basePrice: 200 },
+    { id: 'round_table', title: 'Круглий стіл', icon: <FiCircle className="text-2xl" />, description: 'Стіл для обговорень та брейнштормів (до 4 осіб).', basePrice: 150 },
+    { id: 'sofa', title: 'Лаунж зона (Диван)', icon: <FiCoffee className="text-2xl" />, description: 'М\'яка зона для комфортної та розслабленої роботи.', basePrice: 80 },
 ];
 
-const SERVICES = [
-    {
-        id: 1,
-        category: 'desk',
-        title: 'Hot Desk (Вільна посадка)',
-        description: 'Будь-яке вільне місце в опен-спейсі. Доступ до розетки та Wi-Fi.',
-        price: 50,
-        duration: '1 год',
-        image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=200'
-    },
-    {
-        id: 2,
-        category: 'desk',
-        title: 'Dedicated Desk (Фіксоване)',
-        description: 'Ваш особистий стіл з монітором та зручним кріслом.',
-        price: 80,
-        duration: '1 год',
-        image: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=200'
-    },
-    {
-        id: 3,
-        category: 'meeting',
-        title: 'Small Meeting Room',
-        description: 'Кімната для зустрічей на 4 особи. TV, дошка.',
-        price: 200,
-        duration: '1 год',
-        image: 'https://images.unsplash.com/photo-1517502884422-41e157d4ed30?auto=format&fit=crop&q=80&w=200'
-    },
-    {
-        id: 4,
-        category: 'meeting',
-        title: 'Conference Hall',
-        description: 'Великий зал для лекцій та презентацій (до 20 осіб).',
-        price: 500,
-        duration: '1 год',
-        image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=200'
-    },
+// 2. Додаткові послуги
+const EXTRA_SERVICES = [
+    { id: 'monitor', label: 'Додатковий монітор 27"', price: 50, icon: <FiMonitor /> },
+    { id: 'coffee', label: 'Безлімітна кава/чай', price: 100, icon: <FiCoffee /> },
+    { id: 'locker', label: 'Шафка для речей', price: 30, icon: <FiBriefcase /> }
 ];
 
 function MainPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Стейт користувача
     const [user, setUser] = useState(null);
-    const [activeCategory, setActiveCategory] = useState('desk');
-    const [selectedItem, setSelectedItem] = useState(null);
     const [isOpen, setIsOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    // Перевірка авторизації та прослуховування змін
+    // --- СТЕЙТИ БРОНЮВАННЯ ---
+    // Якщо ми повернулися з карти, тут буде об'єкт обраного місця
+    const [selectedSeat, setSelectedSeat] = useState(location.state?.selectedSeat || null);
+
+    // Стейт для Кроку 1 (Вибір категорії)
+    const [selectedCategory, setSelectedCategory] = useState(SPACE_TYPES[0]);
+
+    // Стейт для Кроку 3 (Налаштування часу та послуг)
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [hours, setHours] = useState(1);
+    const [selectedExtras, setSelectedExtras] = useState([]);
+
     useEffect(() => {
         const loadUser = async () => {
             const storedUserStr = localStorage.getItem('user');
-            
             if (storedUserStr) {
                 const storedUser = JSON.parse(storedUserStr);
-                // 1. Одразу встановлюємо локальні дані, щоб інтерфейс не "стрибав"
-                setUser(storedUser); 
-
-                // 2. Фоново робимо запит до БД за найсвіжішими даними (аватар, баланс тощо)
+                setUser(storedUser);
                 const userId = storedUser.user_id || storedUser.id;
                 if (userId) {
                     try {
                         const response = await axios.get(`http://localhost:3005/api/user/${userId}`);
-                        // Об'єднуємо старі дані з новими
                         const freshUserData = { ...storedUser, ...response.data };
-                        
                         setUser(freshUserData);
-                        // Оновлюємо localStorage, щоб інші сторінки теж бачили свіжі дані
                         localStorage.setItem('user', JSON.stringify(freshUserData));
-                    } catch (error) {
-                        console.error("Не вдалося оновити дані користувача на головній сторінці:", error);
-                    }
+                    } catch (error) { console.error("Помилка оновлення даних:", error); }
                 }
             }
         };
-
         loadUser();
-
-        // Прослуховуємо подію оновлення (наприклад, коли змінили аватар в налаштуваннях)
         window.addEventListener("userUpdated", loadUser);
-        
         return () => window.removeEventListener("userUpdated", loadUser);
-    }, [navigate]);
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('user');
         location.reload();
     };
 
-    // Фільтрація послуг
-    const filteredServices = SERVICES.filter(s => s.category === activeCategory);
+    const toggleExtra = (id) => {
+        setSelectedExtras(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
+    };
+
+    const handleGoToMap = () => {
+        navigate('/book-map', { state: { category: selectedCategory.id } });
+    };
+
+    const handleCancelSeat = () => {
+        setSelectedSeat(null);
+        navigate('/', { replace: true, state: {} }); // Очищаємо стейт роутера
+    };
+
+    const handleConfirmBooking = () => {
+        if (!user) {
+            alert("Будь ласка, увійдіть в акаунт, щоб завершити бронювання.");
+            navigate('/login');
+            return;
+        }
+
+        // Тут буде логіка відправки на бекенд, поки що просто повідомлення
+        alert(`🎉 Бронювання успішне!\n\nМісце: ${selectedSeat.label || selectedSeat.type}\nДата: ${date}\nТривалість: ${hours} год.\nСума до сплати: ${totalAmount} ₴`);
+        navigate('/user-page');
+    };
+
+    // Розрахунки
+    const basePrice = selectedSeat
+        ? SPACE_TYPES.find(t => t.id === selectedSeat.type)?.basePrice || 50
+        : selectedCategory.basePrice;
+
+    const extrasTotal = selectedExtras.reduce((sum, extId) => sum + EXTRA_SERVICES.find(e => e.id === extId).price, 0);
+    const totalAmount = (basePrice * hours) + extrasTotal;
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-[var(--day-pink)] to-[var(--day-purple)] dark:from-[var(--night-dark-blue)] dark:to-[var(--night-dark-purple)] font-sans">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans pb-12">
             <MainPageHeader
-                user={user}
-                setIsOpen={setIsOpen}
-                setUser={setUser}
-                isOpen={isOpen}
-                navigate={navigate}
-                isSettingsOpen={isSettingsOpen}
-                setIsSettingsOpen={setIsSettingsOpen}
-                handleLogout={handleLogout}
+                user={user} setIsOpen={setIsOpen} setUser={setUser} isOpen={isOpen} navigate={navigate}
+                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleLogout={handleLogout}
             />
+
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex flex-col lg:flex-row gap-8">
 
-                    {/* Left Column: Services */}
+                    {/* ЛІВА КОЛОНКА: ДИНАМІЧНА (Залежить від того, чи обрано місце) */}
                     <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Оберіть робочий простір</h1>
-                        <p className="text-gray-500 mb-8">Забронюйте ідеальне місце для продуктивної роботи</p>
+                        {!selectedSeat ? (
+                            /* КРОК 1: ВИБІР КАТЕГОРІЇ */
+                            <div className="animate-in fade-in slide-in-from-bottom-4">
+                                <span className="text-sm font-bold text-purple-600 tracking-wider uppercase mb-2 block">Крок 1 з 3</span>
+                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Що вам потрібно сьогодні?</h1>
+                                <p className="text-gray-500 mb-8">Оберіть тип простору, а потім знайдіть ідеальне місце на карті.</p>
 
-                        {/* Categories (Tabs) */}
-                        <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-                            {CATEGORIES.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    onClick={() => setActiveCategory(cat.id)}
-                                    className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${activeCategory === cat.id
-                                        ? 'bg-gray-900 text-white shadow-lg'
-                                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {cat.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* List of Items */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            {filteredServices.length > 0 ? (
-                                filteredServices.map((item, index) => (
-                                    <div
-                                        key={item.id}
-                                        onClick={() => setSelectedItem(item)}
-                                        className={`p-6 flex items-center gap-4 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-gray-50 ${selectedItem?.id === item.id ? 'bg-purple-50' : ''
-                                            }`}
-                                    >
-                                        {/* Radio Circle */}
-                                        <div className={`flex-shrink-0 text-2xl ${selectedItem?.id === item.id ? 'text-[#D1CCF4]' : 'text-gray-300'}`}>
-                                            {selectedItem?.id === item.id ? <FiCheckCircle /> : <FiCircle />}
-                                        </div>
-
-                                        {/* Text Info */}
-                                        <div className="flex-grow">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
-                                                <span className="font-bold text-gray-900">{item.price} ₴</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {SPACE_TYPES.map(type => (
+                                        <div
+                                            key={type.id}
+                                            onClick={() => setSelectedCategory(type)}
+                                            className={`p-6 rounded-2xl cursor-pointer transition-all border-2 ${selectedCategory.id === type.id ? 'border-purple-500 bg-purple-50 shadow-md transform scale-[1.02]' : 'border-transparent bg-white shadow-sm hover:shadow-md'}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className={`p-3 rounded-xl ${selectedCategory.id === type.id ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {type.icon}
+                                                </div>
+                                                <div className={`text-2xl ${selectedCategory.id === type.id ? 'text-purple-500' : 'text-gray-300'}`}>
+                                                    {selectedCategory.id === type.id ? <FiCheckCircle /> : <FiCircle />}
+                                                </div>
                                             </div>
-                                            <p className="text-gray-500 text-sm">{item.description}</p>
-                                            <div className="mt-2 text-xs text-gray-400 flex gap-2">
-                                                <span className="flex items-center gap-1"><FiClock /> {item.duration}</span>
+                                            <h3 className="font-bold text-lg text-gray-900 mb-1">{type.title}</h3>
+                                            <p className="text-sm text-gray-500 mb-4">{type.description}</p>
+                                            <div className="font-bold text-gray-900 bg-white inline-block px-3 py-1 rounded-full text-sm border">
+                                                від {type.basePrice} ₴ / год
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            /* КРОК 3: НАЛАШТУВАННЯ ЧАСУ ТА ПОСЛУГ */
+                            <div className="animate-in fade-in slide-in-from-bottom-4">
+                                <span className="text-sm font-bold text-green-600 tracking-wider uppercase mb-2 block">Крок 3 з 3</span>
+                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Налаштуйте бронювання</h1>
+                                <p className="text-gray-500 mb-8">Ви обрали <b className="text-gray-900">{selectedSeat.label || 'місце'}</b>. Вкажіть час та додаткові побажання.</p>
+
+                                {/* Вибір дати та часу */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FiClock /> Коли вас чекати?</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Дата</label>
+                                            <input
+                                                type="date"
+                                                value={date}
+                                                min={new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => setDate(e.target.value)}
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Кількість годин</label>
+                                            <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl p-1">
+                                                <button onClick={() => setHours(Math.max(1, hours - 1))} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600">-</button>
+                                                <span className="flex-1 text-center font-bold">{hours} год.</span>
+                                                <button onClick={() => setHours(Math.min(12, hours + 1))} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600">+</button>
                                             </div>
                                         </div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="p-8 text-center text-gray-500">
-                                    У цій категорії поки немає доступних опцій.
                                 </div>
-                            )}
-                        </div>
+
+                                {/* Додаткові послуги */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <h3 className="font-bold text-gray-900 mb-4">Додати до бронювання</h3>
+                                    <div className="space-y-3">
+                                        {EXTRA_SERVICES.map(extra => (
+                                            <label key={extra.id} className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${selectedExtras.includes(extra.id) ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedExtras.includes(extra.id)}
+                                                        onChange={() => toggleExtra(extra.id)}
+                                                        className="w-5 h-5 text-purple-600 rounded cursor-pointer"
+                                                    />
+                                                    <div className="flex items-center gap-2 text-gray-700 font-medium">
+                                                        <span className="text-gray-400">{extra.icon}</span> {extra.label}
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-gray-900">+{extra.price} ₴</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Right Column: Sidebar (Sticky) */}
+                    {/* ПРАВА КОЛОНКА: САЙДБАР З ПІДСУМКАМИ */}
                     <div className="lg:w-96">
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
                             <h2 className="text-xl font-bold text-gray-800 mb-6">Ваше бронювання</h2>
 
-                            {selectedItem ? (
+                            {!selectedSeat ? (
+                                /* САЙДБАР КРОКУ 1 */
                                 <>
-                                    <div className="mb-6">
-                                        <img
-                                            src={selectedItem.image}
-                                            alt="Selected"
-                                            className="w-full h-40 object-cover rounded-xl mb-4 shadow-sm"
-                                        />
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h3 className="font-bold text-gray-900">{selectedItem.title}</h3>
-                                                <p className="text-sm text-gray-500">TimeGuard Coworking Space</p>
-                                            </div>
-                                            <span className="font-bold text-[#D1CCF4]">{selectedItem.price} ₴</span>
+                                    <div className="bg-gray-50 p-4 rounded-xl mb-6">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">{selectedCategory.icon}</div>
+                                            <h3 className="font-bold text-gray-900">{selectedCategory.title}</h3>
                                         </div>
+                                        <p className="text-sm text-gray-500">{selectedCategory.description}</p>
                                     </div>
-
-                                    <div className="space-y-4 mb-8">
-                                        <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                                            <FiMapPin className="text-purple-500" />
-                                            <span>Вул. Шевченка, 12, Івано-Франківськ</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                                            <FiCalendar className="text-purple-500" />
-                                            <span>Сьогодні, 24 Грудня</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="border-t pt-4 mb-6">
-                                        <div className="flex justify-between text-lg font-bold">
-                                            <span>Всього</span>
-                                            <span>{selectedItem.price} ₴</span>
-                                        </div>
-                                    </div>
-
                                     <button
-                                        // ТУТ ми пізніше додамо перехід на карту
-                                        onClick={() => alert("Перехід на карту для вибору конкретного столу...")}
-                                        className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-[#D1CCF4] transition-colors shadow-lg shadow-purple-200"
+                                        onClick={handleGoToMap}
+                                        className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors shadow-lg shadow-purple-200"
                                     >
-                                        Продовжити
+                                        Обрати на карті ➔
                                     </button>
                                 </>
                             ) : (
-                                <div className="text-center py-10">
-                                    <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                                        <FiCheckCircle size={32} />
+                                /* САЙДБАР КРОКУ 3 */
+                                <>
+                                    <div className="mb-6 space-y-4">
+                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <FiMapPin className="text-purple-500" /> Місце
+                                            </div>
+                                            <span className="font-bold text-gray-900">{selectedSeat.label || 'Без назви'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <FiCalendar className="text-purple-500" /> Дата
+                                            </div>
+                                            <span className="font-bold text-gray-900">{new Date(date).toLocaleDateString('uk-UA')}</span>
+                                        </div>
                                     </div>
-                                    <p className="text-gray-500">Оберіть послугу зі списку зліва, щоб побачити деталі.</p>
-                                </div>
+
+                                    <div className="border-t border-gray-100 pt-4 mb-6 space-y-2 text-sm text-gray-600">
+                                        <div className="flex justify-between">
+                                            <span>Оренда ({hours} год. × {basePrice} ₴)</span>
+                                            <span className="font-medium">{basePrice * hours} ₴</span>
+                                        </div>
+                                        {selectedExtras.map(extId => {
+                                            const ext = EXTRA_SERVICES.find(e => e.id === extId);
+                                            return (
+                                                <div key={ext.id} className="flex justify-between text-gray-500">
+                                                    <span>{ext.label}</span>
+                                                    <span>{ext.price} ₴</span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    <div className="border-t border-gray-200 pt-4 mb-6">
+                                        <div className="flex justify-between text-xl font-black text-gray-900">
+                                            <span>Всього</span>
+                                            <span className="text-purple-600">{totalAmount} ₴</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={handleConfirmBooking}
+                                            className="w-full py-4 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200"
+                                        >
+                                            Оплатити та забронювати
+                                        </button>
+                                        <button
+                                            onClick={handleCancelSeat}
+                                            className="w-full py-3 bg-white text-gray-500 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                                        >
+                                            Змінити місце
+                                        </button>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
-
                 </div>
             </main>
-        </div>)
+        </div>
+    );
 }
 
-
 export default MainPage;
-
-
-
-

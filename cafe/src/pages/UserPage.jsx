@@ -176,7 +176,7 @@ const UserPage = () => {
                 <div className="flex gap-8 border-b border-gray-200 dark:border-gray-800 mb-8 overflow-x-auto scrollbar-hide">
                     {[
                         { id: 'bookings', label: 'Бронювання', icon: <FiCalendar /> },
-                        { id: 'wallet', label: 'Гаманець', icon: <FiCreditCard /> },
+                        { id: 'statistics', label: 'Статистика', icon: <FiCreditCard /> },
                         { id: 'settings', label: 'Профіль', icon: <FiSettings /> }
                     ].map((tab) => (
                         <button
@@ -226,16 +226,16 @@ const UserPage = () => {
                     )}
 
                     {/* ТАБ 2: Гаманець */}
-                    {activeTab === 'wallet' && (
+                    {activeTab === 'statistics' && (
                         <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 text-center">
                             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
                                 <FiCreditCard size={32} />
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Платіжні методи</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-6">У вас поки немає збережених карток</p>
-                            <button className="px-8 py-3 bg-gray-900 dark:bg-[var(--night-dark-blue)] text-white rounded-xl font-bold hover:opacity-90 transition-all">
-                                Додати картку
-                            </button>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Статистика</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mb-6">Тут буде відображено вашу статистику користування послугами</p>
+                            {/* <button className="px-8 py-3 bg-gray-900 dark:bg-[var(--night-dark-blue)] text-white rounded-xl font-bold hover:opacity-90 transition-all">
+                              
+                            </button> */}
                         </div>
                     )}
 

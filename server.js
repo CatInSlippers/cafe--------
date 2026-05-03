@@ -259,59 +259,54 @@ app.post('/reset-password/:id/:token', async (req, res) => {
 // МАРШРУТИ ДЛЯ КАРТИ (MAPS API)
 // ==========================================
 
-// 1. ЗБЕРЕГТИ КАРТУ (Або оновити, якщо існує)
 app.post('/api/maps', async (req, res) => {
     try {
-        const { name, objects } = req.body;
+        const { name, objects } = req.body; // З фронтенду приходить масив під назвою objects
 
         if (!name || !objects) {
-            return res.status(400).json({ error: "Назва та об'єкти обов'язкові" });
+            return res.status(400).json({ error: 'Необхідно передати name та objects' });
         }
 
-        // Використовуємо UPSERT (Update або Insert)
-        // Якщо карта з таким name існує -> оновлюємо objects та час
-        // Якщо ні -> створюємо нову
+        // ВИПРАВЛЕНО: Таблиця maps, колонка object. 
+        // Використовуємо UPSERT: якщо карта з таким іменем вже є — оновлюємо її, якщо ні — створюємо нову
         const query = `
-            INSERT INTO maps (name, objects, updated_at)
-            VALUES ($1, $2, NOW())
+            INSERT INTO maps (name, object) 
+            VALUES ($1, $2) 
             ON CONFLICT (name) 
-            DO UPDATE SET 
-                objects = EXCLUDED.objects,
-                updated_at = NOW()
+            DO UPDATE SET object = EXCLUDED.object, updated_at = CURRENT_TIMESTAMP
             RETURNING *;
         `;
 
-        // PostgreSQL автоматично перетворить JS-об'єкт в JSONB завдяки драйверу pg
+        // Зберігаємо масив фігур як JSON
         const result = await pool.query(query, [name, JSON.stringify(objects)]);
 
-        res.json({
-            message: "Карту успішно збережено",
-            map: result.rows[0]
-        });
+        res.status(200).json({ message: 'Карту успішно збережено', map: result.rows[0] });
 
-    } catch (err) {
-        console.error("Помилка збереження карти:", err.message);
-        res.status(500).json({ error: "Помилка сервера при збереженні" });
+    } catch (error) {
+        console.error('Помилка збереження карти:', error);
+        res.status(500).json({ error: 'Помилка сервера при збереженні' });
     }
 });
 
-// 2. ОТРИМАТИ КАРТУ ЗА НАЗВОЮ
+// 2. ОТРИМАТИ КАРТУ
 app.get('/api/maps/:name', async (req, res) => {
     try {
         const { name } = req.params;
-
-        const result = await pool.query("SELECT objects FROM maps WHERE name = $1", [name]);
+        
+        // ВИПРАВЛЕНО: Таблиця maps, колонка object
+        const query = 'SELECT object FROM maps WHERE name = $1';
+        const result = await pool.query(query, [name]);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Карту не знайдено" });
+            return res.status(404).json({ error: 'Карту не знайдено' });
         }
 
-        // Повертаємо тільки масив об'єктів
-        res.json(result.rows[0].objects);
-
-    } catch (err) {
-        console.error("Помилка завантаження карти:", err.message);
-        res.status(500).json({ error: "Помилка сервера при завантаженні" });
+        // Бібліотека 'pg' автоматично парсить JSON, тому повертаємо колонку object
+        res.status(200).json(result.rows[0].object);
+        
+    } catch (error) {
+        console.error('Помилка отримання карти:', error);
+        res.status(500).json({ error: 'Помилка сервера' });
     }
 });
 
