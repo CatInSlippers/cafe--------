@@ -36,9 +36,11 @@ function MainPage() {
     const [selectedCategory, setSelectedCategory] = useState(SPACE_TYPES[0]);
 
     // Стейт для Кроку 3 (Налаштування часу та послуг)
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [hours, setHours] = useState(1);
+    const [date, setDate] = useState(location.state?.date || new Date().toISOString().split('T')[0]);
+    const [startTime, setStartTime] = useState(location.state?.startTime || '10:00');
+    const [hours, setHours] = useState(location.state?.hours || 1);
     const [selectedExtras, setSelectedExtras] = useState([]);
+
 
     useEffect(() => {
         const loadUser = async () => {
@@ -80,16 +82,49 @@ function MainPage() {
         navigate('/', { replace: true, state: {} }); // Очищаємо стейт роутера
     };
 
-    const handleConfirmBooking = () => {
+    const handleConfirmBooking = async () => {
         if (!user) {
-            alert("Будь ласка, увійдіть в акаунт, щоб завершити бронювання.");
+            alert("Будь ласка, увійдіть в акаунт.");
             navigate('/login');
             return;
         }
 
-        // Тут буде логіка відправки на бекенд, поки що просто повідомлення
-        alert(`🎉 Бронювання успішне!\n\nМісце: ${selectedSeat.label || selectedSeat.type}\nДата: ${date}\nТривалість: ${hours} год.\nСума до сплати: ${totalAmount} ₴`);
-        navigate('/user-page');
+        try {
+            const userId = user.user_id || user.id;
+
+            // Збираємо назви обраних додаткових послуг
+            const extrasLabels = selectedExtras.map(extId =>
+                EXTRA_SERVICES.find(e => e.id === extId).label
+            );
+
+            const bookingData = {
+                user_id: userId,
+                seat_id: selectedSeat ? selectedSeat.id : selectedCategory.id,
+                seat_label: selectedSeat ? (selectedSeat.label || selectedSeat.type) : selectedCategory.title,
+                booking_date: date,
+                start_time: startTime,
+                duration_hours: hours,
+                total_price: totalAmount,
+                extras: extrasLabels // Додаємо масив послуг
+            };
+
+            const response = await axios.post('http://localhost:3005/api/bookings', bookingData);
+
+            if (response.status === 201) {
+                const extrasText = extrasLabels.length > 0 ? `\nДод. послуги: ${extrasLabels.join(', ')}` : '';
+                alert(`Бронювання успішне!\n\nМісце: ${bookingData.seat_label}\nДата: ${date}\nЧас початку: ${startTime}\nТривалість: ${hours} год.${extrasText}\nСума: ${totalAmount} грн`); navigate('/user-page');
+            }
+        } catch (error) {
+            console.error("Помилка при бронюванні:", error);
+
+            // Якщо сервер повернув нашу конкретну помилку (наприклад, про зайнятий стіл)
+            if (error.response && error.response.data && error.response.data.error) {
+                alert(error.response.data.error);
+            } else {
+                // Якщо сервер впав або немає зв'язку
+                alert("Не вдалося створити бронювання. Спробуйте ще раз.");
+            }
+        }
     };
 
     // Розрахунки
@@ -153,7 +188,7 @@ function MainPage() {
                                 {/* Вибір дати та часу */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
                                     <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FiClock /> Коли вас чекати?</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-500 mb-1">Дата</label>
                                             <input
@@ -164,6 +199,17 @@ function MainPage() {
                                                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
                                             />
                                         </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Час початку</label>
+                                            <input
+                                                type="time"
+                                                value={startTime}
+                                                onChange={(e) => setStartTime(e.target.value)}
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                        </div>
+
                                         <div>
                                             <label className="block text-sm font-medium text-gray-500 mb-1">Кількість годин</label>
                                             <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl p-1">

@@ -292,7 +292,7 @@ app.post('/api/maps', async (req, res) => {
 app.get('/api/maps/:name', async (req, res) => {
     try {
         const { name } = req.params;
-        
+
         // ВИПРАВЛЕНО: Таблиця maps, колонка object
         const query = 'SELECT object FROM maps WHERE name = $1';
         const result = await pool.query(query, [name]);
@@ -303,7 +303,7 @@ app.get('/api/maps/:name', async (req, res) => {
 
         // Бібліотека 'pg' автоматично парсить JSON, тому повертаємо колонку object
         res.status(200).json(result.rows[0].object);
-        
+
     } catch (error) {
         console.error('Помилка отримання карти:', error);
         res.status(500).json({ error: 'Помилка сервера' });
@@ -454,6 +454,166 @@ app.post('/api/user/:id/avatar', upload.single('avatar'), async (req, res) => {
 
     } catch (err) {
         console.error("Помилка завантаження аватара:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// ==========================================
+// МАРШРУТИ БРОНЮВАННЯ (BOOKINGS)
+// ==========================================
+
+// 1. СТВОРЕННЯ БРОНЮВАННЯ
+// 1. СТВОРЕННЯ БРОНЮВАННЯ
+app.post('/api/bookings', async (req, res) => {
+    try {
+        const { user_id, seat_id, seat_label, booking_date, start_time, duration_hours, total_price, extras } = req.body;
+
+        if (!user_id || !seat_id || !booking_date || !start_time || !duration_hours) {
+            return res.status(400).json({ error: "Недостатньо даних для бронювання" });
+        }
+
+        // --- НОВИЙ БЛОК: Перевірка на перетин часу (Overlap Check) ---
+        // Логіка: Початок існуючої броні < Кінець нової броні АНД Кінець існуючої броні > Початок нової броні
+        const overlapQuery = `
+            SELECT * FROM bookings 
+            WHERE seat_id = $1 
+              AND booking_date = $2 
+              AND status = 'active'
+              AND start_time < ($3::time + $4::int * interval '1 hour')
+              AND (start_time + duration_hours * interval '1 hour') > $3::time
+        `;
+
+        const overlapResult = await pool.query(overlapQuery, [seat_id, booking_date, start_time, duration_hours]);
+
+        if (overlapResult.rows.length > 0) {
+            return res.status(409).json({
+                error: "На жаль, цей стіл вже заброньовано на обраний час. Будь ласка, оберіть іншу годину або інше місце."
+            });
+        }
+        // --- КІНЕЦЬ НОВОГО БЛОКУ ---
+
+        const extrasJson = JSON.stringify(extras || []);
+
+        const newBooking = await pool.query(
+            `INSERT INTO bookings (user_id, seat_id, seat_label, booking_date, start_time, duration_hours, total_price, extras) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [user_id, seat_id, seat_label, booking_date, start_time, duration_hours, total_price, extrasJson]
+        );
+
+        res.status(201).json({ message: "Успішно заброньовано", booking: newBooking.rows[0] });
+    } catch (err) {
+        console.error("Помилка створення бронювання:", err.message);
+        res.status(500).json({ error: "Помилка сервера при створенні бронювання" });
+    }
+});
+
+// 2. ОТРИМАННЯ БРОНЮВАНЬ КОРИСТУВАЧА
+app.get('/api/user/:id/bookings', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bookings = await pool.query(
+            "SELECT * FROM bookings WHERE user_id = $1 ORDER BY booking_date DESC, created_at DESC",
+            [id]
+        );
+        res.json(bookings.rows);
+    } catch (err) {
+        console.error("Помилка отримання бронювань:", err.message);
+        res.status(500).json({ error: "Помилка сервера при отриманні бронювань" });
+    }
+});
+
+// ==========================================
+// ОТРИМАННЯ ЗАЙНЯТИХ МІСЦЬ ДЛЯ КАРТИ
+// ==========================================
+app.get('/api/bookings/occupied', async (req, res) => {
+    try {
+        const { date, start_time, duration_hours } = req.query;
+
+        if (!date || !start_time || !duration_hours) {
+            return res.json([]);
+        }
+
+        const query = `
+            SELECT seat_id FROM bookings 
+            WHERE booking_date = $1 
+              AND status = 'active'
+              AND start_time < ($2::time + $3::int * interval '1 hour')
+              AND (start_time + duration_hours * interval '1 hour') > $2::time
+        `;
+
+        const result = await pool.query(query, [date, start_time, duration_hours]);
+
+        // Повертаємо лише масив ID (наприклад: ["desk-123", "round_table-456"])
+        const occupiedSeats = result.rows.map(row => row.seat_id);
+
+        res.json(occupiedSeats);
+    } catch (err) {
+        console.error("Помилка отримання зайнятих місць:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+
+// ==========================================
+// МАРШРУТИ АДМІНІСТРАТОРА (ADMIN API)
+// ==========================================
+
+// 1. Отримати список всіх користувачів
+// 1. Отримати список всіх користувачів (ОНОВЛЕНО: додано нові колонки)
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const result = await pool.query(
+            // Додали banned та banned_time
+            "SELECT user_id, full_name, email, phone, role, balance, created_at, avatar, banned, banned_time FROM users ORDER BY created_at DESC"
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Помилка отримання користувачів:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 2. Видалити користувача (Адмін)
+app.delete('/api/admin/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
+        res.json({ message: "Користувача успішно видалено" });
+    } catch (err) {
+        console.error("Помилка видалення:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 3. НОВИЙ МАРШРУТ: Забанити / Розбанити користувача
+app.patch('/api/admin/users/:id/ban', async (req, res) => {
+    const { id } = req.params;
+    const { banned } = req.body; // Отримуємо бажаний статус: true або false
+
+    try {
+        let query;
+        let values;
+
+        if (banned) {
+            // Якщо банимо — встановлюємо banned = true та поточний час
+            query = "UPDATE users SET banned = true, banned_time = CURRENT_TIMESTAMP WHERE user_id = $1 RETURNING *";
+            values = [id];
+        } else {
+            // Якщо розбанюємо — встановлюємо banned = false та обнуляємо час
+            query = "UPDATE users SET banned = false, banned_time = NULL WHERE user_id = $1 RETURNING *";
+            values = [id];
+        }
+
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Користувача не знайдено" });
+        }
+
+        res.json({ message: banned ? "Користувача забанено" : "Користувача розбанено", user: result.rows[0] });
+
+    } catch (err) {
+        console.error("Помилка зміни статусу бану:", err.message);
         res.status(500).json({ error: "Помилка сервера" });
     }
 });

@@ -115,12 +115,12 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
                 const d = Math.min(w, h) * 0.35;
                 return <Group><Line points={[0, 0, w, 0, w, d, d, d, d, h, 0, h]} closed fill={fill} stroke={stroke} lineJoin="round" /><Line points={[5, 5, w - 5, 5]} stroke="white" strokeWidth={2} opacity={0.5} listening={false} /></Group>;
             case 'socket': return <Group><Circle radius={r} fill={COLORS.SOCKET} stroke="black" strokeWidth={1} /><Path data="M-3 -4 L3 -4 L-1 2 L4 2 L-2 7 L-1 2 L-4 2 Z" fill="white" x={1} /></Group>;
-            
+
             case 'stairs':
                 const stepCount = Math.max(3, Math.floor(h / 15));
                 const steps = [];
                 for (let i = 1; i < stepCount; i++) {
-                    steps.push(<Line key={i} points={[0, (h/stepCount) * i, w, (h/stepCount) * i]} stroke="#9CA3AF" strokeWidth={1} listening={false}/>);
+                    steps.push(<Line key={i} points={[0, (h / stepCount) * i, w, (h / stepCount) * i]} stroke="#9CA3AF" strokeWidth={1} listening={false} />);
                 }
                 return (
                     <Group>
@@ -132,14 +132,14 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
                 return (
                     <Group>
                         <Rect width={w} height={h} fill={fill} cornerRadius={4} stroke={stroke} />
-                        <Circle x={w/2} y={h/2} radius={w/3.5} fill="#451A03" listening={false} />
+                        <Circle x={w / 2} y={h / 2} radius={w / 3.5} fill="#451A03" listening={false} />
                     </Group>
                 );
             case 'water':
                 return (
                     <Group>
                         <Circle radius={r} fill={fill} stroke={stroke} />
-                        <Circle radius={r/2} fill="#93C5FD" listening={false} />
+                        <Circle radius={r / 2} fill="#93C5FD" listening={false} />
                     </Group>
                 );
             case 'whiteboard':
@@ -151,7 +151,7 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
                         <Text text={shapeProps.label} width={w} height={h} fontSize={shapeProps.fontSize || 24} fontStyle="bold" fill={COLORS.TEXT} align="center" verticalAlign="middle" listening={false} />
                     </Group>
                 );
-            
+
             case 'desk':
             case 'meeting_table':
                 return (
@@ -188,7 +188,7 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
             dragBoundFunc={(pos) => ({ x: snapToGrid(pos.x), y: snapToGrid(pos.y) })}
             onMouseEnter={(e) => e.target.getStage().container().style.cursor = 'move'}
             onMouseLeave={(e) => e.target.getStage().container().style.cursor = 'default'}
-            
+
             onDragStart={(e) => {
                 if (shapeProps.groupId) {
                     const stage = e.target.getStage();
@@ -255,7 +255,7 @@ const AdminEditor = () => {
 
     const [selectedIds, setSelectedIds] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
-    
+
     // Стан для попапів
     const [isStatsOpen, setIsStatsOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -357,7 +357,7 @@ const AdminEditor = () => {
         if (selectedIds.length === 0) return;
         const newShapes = [];
         const newSelection = [];
-        const groupMapping = {}; 
+        const groupMapping = {};
 
         selectedIds.forEach(id => {
             const shape = shapes.find(s => s.id === id);
@@ -518,7 +518,7 @@ const AdminEditor = () => {
 
             {/* TOP BAR ACTION BUTTONS */}
             <div className="absolute top-4 right-4 z-40 flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-2 rounded-xl shadow-md border border-gray-100">
-                <button onClick={() => navigate('/')} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded transition" title="На головну">
+                <button onClick={() => navigate('/admin')} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded transition" title="На головну">
                     <FiArrowLeft size={20} />
                 </button>
                 <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -541,8 +541,8 @@ const AdminEditor = () => {
             {isStatsOpen && (
                 <div className="absolute top-20 right-4 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 z-40 p-5 animate-in fade-in slide-in-from-top-2">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2"><BiStats className="text-orange-500"/> Статистика залу</h3>
-                        <button onClick={() => setIsStatsOpen(false)} className="text-gray-400 hover:text-gray-600"><FiX size={18}/></button>
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2"><BiStats className="text-orange-500" /> Статистика залу</h3>
+                        <button onClick={() => setIsStatsOpen(false)} className="text-gray-400 hover:text-gray-600"><FiX size={18} /></button>
                     </div>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
@@ -567,7 +567,7 @@ const AdminEditor = () => {
                     <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95">
                         <div className="bg-blue-500 p-4 flex justify-between items-center">
                             <h2 className="text-white font-bold text-lg flex items-center gap-2"><FiHelpCircle /> Керування редактором</h2>
-                            <button onClick={() => setIsHelpOpen(false)} className="text-white/80 hover:text-white bg-blue-600 hover:bg-blue-700 p-1 rounded-full transition"><FiX size={20}/></button>
+                            <button onClick={() => setIsHelpOpen(false)} className="text-white/80 hover:text-white bg-blue-600 hover:bg-blue-700 p-1 rounded-full transition"><FiX size={20} /></button>
                         </div>
                         <div className="p-6 space-y-4 text-sm text-gray-600">
                             <div className="flex items-start gap-3">
@@ -686,7 +686,7 @@ const AdminEditor = () => {
             {/* PROPERTIES PANEL */}
             {selectedIds.length > 0 && (
                 <div className="w-72 bg-white border-l border-gray-200 shadow-xl z-20 flex flex-col p-4 animate-slideInRight">
-                    
+
                     {isMultiSelect ? (
                         <div className="space-y-4">
                             <div className="flex justify-between items-center mb-4 pb-4 border-b">
@@ -696,7 +696,7 @@ const AdminEditor = () => {
                                     <button onClick={deleteSelected} className="text-red-500 hover:bg-red-50 p-2 rounded" title="Видалити"><BiTrash size={20} /></button>
                                 </div>
                             </div>
-                            
+
                             {!sameGroupId ? (
                                 <button onClick={handleGroup} className="w-full py-2 bg-indigo-100 text-indigo-700 font-bold rounded hover:bg-indigo-200 transition shadow-sm">
                                     Згрупувати об'єкти
@@ -706,77 +706,77 @@ const AdminEditor = () => {
                                     Розгрупувати
                                 </button>
                             )}
-                            
+
                             <p className="text-xs text-gray-400 mt-4 text-center leading-relaxed">
                                 Затисніть <b>Shift</b> при кліку, щоб додавати або прибирати об'єкти з виділення.
                             </p>
                         </div>
                     ) : (
-                        
-                    singleSelectedShape && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2"><FiSettings /> Властивості</h3>
-                                <div className="flex gap-1">
-                                    <button onClick={duplicateSelected} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded" title="Дублювати (Ctrl+D)"><FiCopy size={20} /></button>
-                                    <button onClick={deleteSelected} className="text-red-500 hover:bg-red-50 p-2 rounded" title="Видалити"><BiTrash size={20} /></button>
+
+                        singleSelectedShape && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center mb-6 pb-4 border-b">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><FiSettings /> Властивості</h3>
+                                    <div className="flex gap-1">
+                                        <button onClick={duplicateSelected} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded" title="Дублювати (Ctrl+D)"><FiCopy size={20} /></button>
+                                        <button onClick={deleteSelected} className="text-red-500 hover:bg-red-50 p-2 rounded" title="Видалити"><BiTrash size={20} /></button>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {!['wall'].includes(singleSelectedShape.type) && (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 block mb-1">Назва / Номер</label>
-                                    <input className="w-full border border-gray-300 rounded p-2 text-sm outline-none" value={singleSelectedShape.label || ''} onChange={(e) => updateShape(singleSelectedShape.id, { label: e.target.value })} />
-                                </div>
-                            )}
-
-                            {singleSelectedShape.type === 'text_label' && (
-                                <SeatsSlider label='Розмір шрифту' min='10' max='72' value={singleSelectedShape.fontSize || 24} onChange={(e) => updateShape(singleSelectedShape.id, { fontSize: parseInt(e.target.value) })} />
-                            )}
-
-                            {(singleSelectedShape.type.includes('desk') || singleSelectedShape.type.includes('table')) && (
-                                <div className="flex items-center justify-between bg-yellow-50 p-3 rounded border border-yellow-200">
-                                    <span className="text-sm font-bold text-yellow-800 flex items-center gap-2"><BiPlug size={18} /> Є розетка?</span>
-                                    <input type="checkbox" checked={singleSelectedShape.hasSocket || false} onChange={(e) => updateShape(singleSelectedShape.id, { hasSocket: e.target.checked })} className="w-5 h-5 text-yellow-600 rounded cursor-pointer" />
-                                </div>
-                            )}
-
-                            {singleSelectedShape.type === 'toilet_zone' && (
-                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
-                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><PiToilet size={14} /> Конфігурація Вбиральні</label>
+                                {!['wall'].includes(singleSelectedShape.type) && (
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 block mb-1">Тип вбиральні</label>
+                                        <label className="text-xs font-bold text-gray-400 block mb-1">Назва / Номер</label>
+                                        <input className="w-full border border-gray-300 rounded p-2 text-sm outline-none" value={singleSelectedShape.label || ''} onChange={(e) => updateShape(singleSelectedShape.id, { label: e.target.value })} />
+                                    </div>
+                                )}
+
+                                {singleSelectedShape.type === 'text_label' && (
+                                    <SeatsSlider label='Розмір шрифту' min='10' max='72' value={singleSelectedShape.fontSize || 24} onChange={(e) => updateShape(singleSelectedShape.id, { fontSize: parseInt(e.target.value) })} />
+                                )}
+
+                                {(singleSelectedShape.type.includes('desk') || singleSelectedShape.type.includes('table')) && (
+                                    <div className="flex items-center justify-between bg-yellow-50 p-3 rounded border border-yellow-200">
+                                        <span className="text-sm font-bold text-yellow-800 flex items-center gap-2"><BiPlug size={18} /> Є розетка?</span>
+                                        <input type="checkbox" checked={singleSelectedShape.hasSocket || false} onChange={(e) => updateShape(singleSelectedShape.id, { hasSocket: e.target.checked })} className="w-5 h-5 text-yellow-600 rounded cursor-pointer" />
+                                    </div>
+                                )}
+
+                                {singleSelectedShape.type === 'toilet_zone' && (
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><PiToilet size={14} /> Конфігурація Вбиральні</label>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">Тип вбиральні</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {TOILET_TYPES.map((type) => (
+                                                    <StatusButton key={type.value} label={type.label} color={type.color} isActive={singleSelectedShape.gender === type.value} onClick={() => updateShape(singleSelectedShape.id, { gender: type.value })} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <SeatsSlider label='Кількість Кабінок' min='1' max='6' value={singleSelectedShape.cabins || 1} onChange={(e) => updateShape(singleSelectedShape.id, { cabins: parseInt(e.target.value) })} />
+                                    </div>
+                                )}
+
+                                {BOOKABLE.includes(singleSelectedShape.type) && singleSelectedShape.status && (
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><CiBookmark size={14} /> Статус місця</label>
                                         <div className="grid grid-cols-2 gap-2">
-                                            {TOILET_TYPES.map((type) => (
-                                                <StatusButton key={type.value} label={type.label} color={type.color} isActive={singleSelectedShape.gender === type.value} onClick={() => updateShape(singleSelectedShape.id, { gender: type.value })} />
+                                            {STATES_TYPES.map((type) => (
+                                                <StatusButton key={type.value} label={type.label} color={type.color} isActive={singleSelectedShape.status === type.value} onClick={() => updateShape(singleSelectedShape.id, { status: type.value })} />
                                             ))}
                                         </div>
+                                        <SeatsSlider label='Кількість Стільців' min='0' max='12' value={singleSelectedShape.seats} onChange={(e) => updateShape(singleSelectedShape.id, { seats: parseInt(e.target.value) })} />
                                     </div>
-                                    <SeatsSlider label='Кількість Кабінок' min='1' max='6' value={singleSelectedShape.cabins || 1} onChange={(e) => updateShape(singleSelectedShape.id, { cabins: parseInt(e.target.value) })} />
-                                </div>
-                            )}
+                                )}
 
-                            {BOOKABLE.includes(singleSelectedShape.type) && singleSelectedShape.status && (
-                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
-                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><CiBookmark size={14} /> Статус місця</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {STATES_TYPES.map((type) => (
-                                            <StatusButton key={type.value} label={type.label} color={type.color} isActive={singleSelectedShape.status === type.value} onClick={() => updateShape(singleSelectedShape.id, { status: type.value })} />
-                                        ))}
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 block mb-2">Поворот</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => updateShape(singleSelectedShape.id, { rotation: (singleSelectedShape.rotation || 0) - 45 })} className="flex-1 bg-gray-100 py-2 rounded text-xs hover:bg-gray-200">↺ -45°</button>
+                                        <button onClick={() => updateShape(singleSelectedShape.id, { rotation: (singleSelectedShape.rotation || 0) + 45 })} className="flex-1 bg-gray-100 py-2 rounded text-xs hover:bg-gray-200">↻ +45°</button>
                                     </div>
-                                    <SeatsSlider label='Кількість Стільців' min='0' max='12' value={singleSelectedShape.seats} onChange={(e) => updateShape(singleSelectedShape.id, { seats: parseInt(e.target.value) })} />
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 block mb-2">Поворот</label>
-                                <div className="flex gap-2">
-                                    <button onClick={() => updateShape(singleSelectedShape.id, { rotation: (singleSelectedShape.rotation || 0) - 45 })} className="flex-1 bg-gray-100 py-2 rounded text-xs hover:bg-gray-200">↺ -45°</button>
-                                    <button onClick={() => updateShape(singleSelectedShape.id, { rotation: (singleSelectedShape.rotation || 0) + 45 })} className="flex-1 bg-gray-100 py-2 rounded text-xs hover:bg-gray-200">↻ +45°</button>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
                 </div>
             )}
         </div>

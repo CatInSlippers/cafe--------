@@ -8,6 +8,7 @@ import { ToiletRenderer } from '../assets/RENDERS/ToiletRenderer';
 import { ChairsRenderer } from '../assets/RENDERS/ChairsRenderer';
 import { SocketIcon } from '../assets/RENDERS/SocketIcon';
 
+
 const GRID_SIZE = 20;
 
 const COLORS = {
@@ -31,10 +32,10 @@ function getFillColor(props) {
 const ClientShapeComponent = React.memo(({ shapeProps, onBook, categoryFilter }) => {
     // ЛОГІКА ПІДСВІЧУВАННЯ: Якщо елемент можна забронювати, але він НЕ ТОГО типу, що шукає користувач - робимо його прозорим
     const isMismatchedCategory = categoryFilter && BOOKABLE.includes(shapeProps.type) && shapeProps.type !== categoryFilter;
-    
+
     // Якщо місце зайняте - воно теж бліде
     const isUnavailable = shapeProps.status === 'booked' || shapeProps.status === 'broken';
-    
+
     const opacity = (isMismatchedCategory || isUnavailable) ? 0.3 : 1;
 
     const styles = useMemo(() => ({
@@ -57,7 +58,7 @@ const ClientShapeComponent = React.memo(({ shapeProps, onBook, categoryFilter })
             case 'stairs':
                 const stepCount = Math.max(3, Math.floor(h / 15));
                 const steps = [];
-                for (let i = 1; i < stepCount; i++) steps.push(<Line key={i} points={[0, (h/stepCount)*i, w, (h/stepCount)*i]} stroke="#9CA3AF" strokeWidth={1}/>);
+                for (let i = 1; i < stepCount; i++) steps.push(<Line key={i} points={[0, (h / stepCount) * i, w, (h / stepCount) * i]} stroke="#9CA3AF" strokeWidth={1} />);
                 return <Group><Rect width={w} height={h} fill="#E5E7EB" stroke={stroke} />{steps}</Group>;
             case 'text_label':
                 return <Text text={shapeProps.label} width={w} height={h} fontSize={shapeProps.fontSize || 24} fontStyle="bold" fill={COLORS.TEXT} align="center" verticalAlign="middle" />;
@@ -109,7 +110,11 @@ const ClientShapeComponent = React.memo(({ shapeProps, onBook, categoryFilter })
 const RoomMapClient = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startTime, setStartTime] = useState('10:00');
+    const [hours, setHours] = useState(1);
+    const [occupiedSeats, setOccupiedSeats] = useState([]); // Стан для зайнятих місць
+
     // Отримуємо категорію, яку клієнт обрав на Кроці 1 (напр. 'desk' або 'meeting_table')
     const categoryFilter = location.state?.category;
 
@@ -122,6 +127,21 @@ const RoomMapClient = () => {
     });
 
     useEffect(() => {
+        const fetchOccupiedSeats = async () => {
+            try {
+                const response = await fetch(`http://localhost:3005/api/bookings/occupied?date=${date}&start_time=${startTime}&duration_hours=${hours}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setOccupiedSeats(data);
+                }
+            } catch (error) {
+                console.error("Помилка завантаження зайнятих місць:", error);
+            }
+        };
+        fetchOccupiedSeats();
+    }, [date, startTime, hours]); // Запускається щоразу, коли змінюється дата або час
+
+    useEffect(() => {
         const loadMap = async () => {
             try {
                 const response = await fetch('http://localhost:3005/api/maps/main_hall');
@@ -129,7 +149,7 @@ const RoomMapClient = () => {
                     const data = await response.json();
                     if (Array.isArray(data)) setShapes(data);
                 }
-            } catch (error) { console.error("Помилка:", error); } 
+            } catch (error) { console.error("Помилка:", error); }
             finally { setLoading(false); }
         };
         loadMap();
@@ -155,7 +175,7 @@ const RoomMapClient = () => {
     // Логіка кліку по місцю
     const handleBookPlace = async (shape, isMismatchedCategory) => {
         if (!BOOKABLE.includes(shape.type)) return; // Клікнули по стіні чи дверях
-        
+
         if (isMismatchedCategory) {
             alert("Це місце не відповідає типу, який ви обрали на попередньому кроці. Шукайте яскраві елементи на карті!");
             return;
@@ -164,9 +184,9 @@ const RoomMapClient = () => {
         if (shape.status === 'booked') return alert('Це місце вже зайняте.');
         if (shape.status === 'broken') return alert('Це місце тимчасово недоступне.');
 
-        // Якщо все ок - ПОВЕРТАЄМОСЯ НА ГОЛОВНУ СТОРІНКУ (Крок 3), передаючи обране місце
-        if (window.confirm(`Обрати місце "${shape.label || 'Без назви'}"?`)) {
-            navigate('/', { state: { selectedSeat: shape } });
+        if (window.confirm(`Бронюємо "${shape.label || 'Робоче місце'}"?`)) {
+            // Передаємо не лише стіл, а й обраний час!
+            navigate('/', { state: { selectedSeat: shape, date, startTime, hours } });
         }
     };
 
@@ -176,18 +196,38 @@ const RoomMapClient = () => {
         <div className="relative h-screen w-full bg-gray-50 overflow-hidden font-sans">
             {/* Панель підказок поверх карти */}
             <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-lg border border-gray-100 max-w-sm">
-                <button 
+                <button
                     onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-4 text-sm font-bold transition"
                 >
                     <FiArrowLeft /> Назад
                 </button>
-                
+
+                {/* Панель вибору часу */}
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mb-4 space-y-3">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500">Дата</label>
+                        <input type="date" value={date} min={new Date().toISOString().split('T')[0]} onChange={e => setDate(e.target.value)} className="w-full text-sm p-1.5 rounded border border-gray-300 outline-none" />
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-gray-500">Початок</label>
+                            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full text-sm p-1.5 rounded border border-gray-300 outline-none" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-gray-500">Тривалість</label>
+                            <select value={hours} onChange={e => setHours(parseInt(e.target.value))} className="w-full text-sm p-1.5 rounded border border-gray-300 outline-none">
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => <option key={h} value={h}>{h} год</option>)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2 mb-2">
                     <span className="bg-purple-100 text-purple-600 px-2 py-0.5 rounded text-sm">Крок 2</span>
                     Оберіть місце
                 </h2>
-                
+
                 <p className="text-gray-500 text-sm mb-4">
                     Ми підсвітили для вас усі відповідні місця зеленим кольором. Натисніть на те, яке вам подобається.
                 </p>
@@ -207,14 +247,23 @@ const RoomMapClient = () => {
                     onWheel={handleWheel} onDragEnd={(e) => { if (e.target === e.target.getStage()) setStageState(prev => ({ ...prev, pos: { x: e.target.x(), y: e.target.y() } })) }}
                 >
                     <Layer>
-                        {shapes.map((shape) => (
-                            <ClientShapeComponent
-                                key={shape.id}
-                                shapeProps={shape}
-                                onBook={handleBookPlace}
-                                categoryFilter={categoryFilter}
-                            />
-                        ))}
+                        {shapes.map((shape) => {
+                            // Якщо ID стола є в масиві зайнятих, примусово ставимо статус 'booked'
+                            const isOccupied = occupiedSeats.includes(shape.id);
+                            const dynamicShapeProps = {
+                                ...shape,
+                                status: isOccupied ? 'booked' : shape.status
+                            };
+
+                            return (
+                                <ClientShapeComponent
+                                    key={shape.id}
+                                    shapeProps={dynamicShapeProps}
+                                    onBook={handleBookPlace}
+                                    categoryFilter={categoryFilter}
+                                />
+                            );
+                        })}
                     </Layer>
                 </Stage>
             </div>

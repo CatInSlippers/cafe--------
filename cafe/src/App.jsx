@@ -4,7 +4,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import UserPage from './pages/UserPage.jsx';
 import AdminEditor from './pages/AdminRoomEditor.jsx'
-import RoomMapClient from './pages/RoomMapClient.jsx'; // Створимо цей файл нижче
+import RoomMapClient from './pages/RoomMapClient.jsx';
+import AdminPage from './pages/AdminPage.jsx';
 
 
 
@@ -16,10 +17,11 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/user-page" element={<UserPage />} />
         <Route path="/book-map" element={<RoomMapClient />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route
           path="/admin/editor"
           element={
-              <AdminEditor />
+            <AdminEditor />
           }
         />
         <Route path="/" element={<MainPage />} />

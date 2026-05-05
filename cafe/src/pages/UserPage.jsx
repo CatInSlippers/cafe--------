@@ -8,25 +8,12 @@ import axios from 'axios';
 import { Logo } from '../assets/Blocks/Logo';
 import UserIcon from '../assets/Blocks/UserIcon';
 
-// --- Фейкова історія бронювань (доки не створимо таблицю bookings) ---
-const MOCK_BOOKINGS = [
-    {
-        id: 101,
-        title: 'Small Meeting Room',
-        date: '2023-12-24',
-        time: '14:00 - 15:00',
-        location: 'Вул. Шевченка, 12, Івано-Франківськ',
-        price: 200,
-        status: 'active',
-        image: 'https://images.unsplash.com/photo-1517502884422-41e157d4ed30?auto=format&fit=crop&q=80&w=200'
-    }
-];
-
 const UserPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('bookings');
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [bookings, setBookings] = useState([]);
 
     // Стейт для редагування профілю
     const [editForm, setEditForm] = useState({ full_name: '', phone: '' });
@@ -35,36 +22,32 @@ const UserPage = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             const storedUser = JSON.parse(localStorage.getItem('user'));
-
-            // Якщо немає збереженого ID, відправляємо на логін
             if (!storedUser || (!storedUser.user_id && !storedUser.id)) {
                 navigate('/login');
                 return;
             }
-
             const userId = storedUser.user_id || storedUser.id;
-
             try {
-                // Запит до вашого бекенду за повними даними
-                const response = await axios.get(`http://localhost:3005/api/user/${userId}`);
-                const userData = response.data;
+                // Паралельно завантажуємо дані користувача та його бронювання
+                const [userResponse, bookingsResponse] = await Promise.all([
+                    axios.get(`http://localhost:3005/api/user/${userId}`),
+                    axios.get(`http://localhost:3005/api/user/${userId}/bookings`)
+                ]);
 
+                const userData = userResponse.data;
                 setUser(userData);
+                setBookings(bookingsResponse.data); // Зберігаємо реальні бронювання
 
-                // Заповнюємо форму редагування поточними даними
                 setEditForm({
                     full_name: userData.full_name || '',
                     phone: userData.phone || ''
                 });
-
             } catch (error) {
-                console.error("Помилка при завантаженні даних користувача:", error);
-                alert("Не вдалося завантажити профіль. Перевірте з'єднання з сервером.");
+                console.error("Помилка завантаження даних:", error);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchUserData();
     }, [navigate]);
 
@@ -196,32 +179,65 @@ const UserPage = () => {
                 <div className="animate-in fade-in duration-500">
 
                     {/* ТАБ 1: Бронювання */}
+                    {/* Вкладка 1: Бронювання */}
                     {activeTab === 'bookings' && (
                         <div className="space-y-4">
-                            {MOCK_BOOKINGS.map(booking => (
-                                <div key={booking.id} className="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row gap-5">
-                                    <img src={booking.image} alt="" className="w-full sm:w-32 h-32 object-cover rounded-2xl" />
-                                    <div className="flex-1 flex flex-col justify-between">
-                                        <div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">{booking.title}</h3>
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${booking.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
-                                                    }`}>
-                                                    {booking.status === 'active' ? 'Активне' : 'Завершено'}
-                                                </span>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                                <div className="flex items-center gap-2"><FiCalendar className="text-[var(--day-purple)]" /> {booking.date}</div>
-                                                <div className="flex items-center gap-2"><FiClock className="text-[var(--day-purple)]" /> {booking.time}</div>
-                                                <div className="flex items-center gap-2 md:col-span-2"><FiMapPin className="text-[var(--day-purple)]" /> {booking.location}</div>
-                                            </div>
+                            {bookings.length === 0 ? (
+                                <div className="text-center py-10 text-gray-500">
+                                    <p>У вас поки немає активних бронювань.</p>
+                                    <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 bg-[var(--day-purple)] text-white rounded-xl font-bold">
+                                        Забронювати місце
+                                    </button>
+                                </div>
+                            ) : (
+                                bookings.map(booking => (
+                                    <div key={booking.booking_id} className="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row gap-5">
+                                        {/* Оскільки в БД ми не зберігали картинку, поставимо заглушку або іконку */}
+                                        <div className="w-full sm:w-32 h-32 bg-purple-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-[var(--day-purple)]">
+                                            <FiMapPin size={40} />
                                         </div>
-                                        <div className="text-right font-bold text-xl text-gray-900 dark:text-white mt-4 sm:mt-0">
-                                            {booking.price} ₴
+                                        <div className="flex-1 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                                                        {booking.seat_label || 'Робоче місце'}
+                                                    </h3>
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${booking.status === 'active' ? 'bg-green-100 text-green-600' :
+                                                        booking.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'
+                                                        }`}>
+                                                        {booking.status === 'active' ? 'Активне' : booking.status === 'cancelled' ? 'Скасоване' : 'Завершене'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                                    <div className="flex items-center gap-2">
+                                                        <FiCalendar className="text-[var(--day-purple)]" />
+                                                        {new Date(booking.booking_date).toLocaleDateString('uk-UA')} о {booking.start_time.slice(0, 5)}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <FiClock className="text-[var(--day-purple)]" />
+                                                        Тривалість: {booking.duration_hours} год.
+                                                    </div>
+
+                                                    {/* Відображення додаткових послуг */}
+                                                    {booking.extras && booking.extras.length > 0 && (
+                                                        <div className="md:col-span-2 flex flex-wrap gap-2 mt-1">
+                                                            {booking.extras.map((extra, index) => (
+                                                                <span key={index} className="px-2 py-1 bg-purple-50 text-[var(--day-purple)] text-xs rounded-md border border-purple-100 font-medium">
+                                                                    + {extra}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right font-bold text-xl text-gray-900 dark:text-white mt-4 sm:mt-0">
+                                                {Number(booking.total_price).toFixed(2)} грн
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     )}
 

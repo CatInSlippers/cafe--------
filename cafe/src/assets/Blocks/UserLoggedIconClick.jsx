@@ -36,7 +36,10 @@ function UserLoggedIconClick({ setUser, user, setIsOpen, isOpen, navigate, isSet
                             icon={<IoSettingsOutline className="text-lg text-gray-500" />}
                         />
                         <ListItem
-                            onClick={handleLogout}
+                            onClick={() => {
+                                handleLogout();
+                                window.location.reload();
+                            }}
                             style="px-4 py-2 hover:bg-gray-100 cursor-pointer text-red-500 border-t border-gray-100 flex items-center justify-between"
                             text="Вийти"
                             icon={<BiLogOut />}
