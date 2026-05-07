@@ -1,5 +1,9 @@
 import Box from "../assets/BiggerFish/Box";
 function LoginPage() {
+    const response = await axios.post('http://localhost:3005/login', { email, password });
+    
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+    localStorage.setItem('token', response.data.token);
     return (
         <main className='min-h-screen bg-gradient-to-b dark:from-[var(--night-dark-blue)] dark:to-[var(--night-dark-purple)] from-[var(--day-pink)] to-[var(--day-purple)] font-sans'>
             <div className="flex justify-between items-baseline">

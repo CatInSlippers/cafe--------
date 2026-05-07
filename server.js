@@ -58,6 +58,38 @@ pool.connect((err) => {
 });
 
 // ==========================================
+// MIDDLEWARES ДЛЯ ЗАХИСТУ API
+// ==========================================
+
+// 1. Перевірка, чи є користувач авторизованим
+const authenticateToken = (req, res, next) => {
+    // Токен зазвичай передається в заголовку Authorization: Bearer <token>
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: "Немає доступу. Будь ласка, увійдіть в акаунт." });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decodedUser) => {
+        if (err) {
+            return res.status(403).json({ error: "Ваша сесія закінчилася. Увійдіть знову." });
+        }
+        // Записуємо розшифровані дані (user_id, role) в об'єкт запиту
+        req.user = decodedUser;
+        next(); // Пропускаємо далі до маршруту
+    });
+};
+
+// 2. Перевірка, чи є користувач Адміністратором
+const isAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Доступ заборонено. Тільки для адміністраторів." });
+    }
+    next();
+};
+
+// ==========================================
 // МАРШРУТ РЕЄСТРАЦІЇ (REGISTRATION ROUTE)
 // ==========================================
 app.post('/register', async (req, res) => {
@@ -101,42 +133,52 @@ app.post('/register', async (req, res) => {
 // ==========================================
 // МАРШРУТ ВХОДУ (LOGIN) - Це знадобиться наступним кроком
 // ==========================================
+// ==========================================
+// МАРШРУТ ВХОДУ (LOGIN)
+// ==========================================
 app.post('/login', async (req, res) => {
     try {
-        // 1. Отримуємо дані від клієнта
         const { email, password } = req.body;
 
-        // Перевірка на наявність даних
         if (!email || !password) {
             return res.status(400).json({ error: "Будь ласка, заповніть всі поля!" });
         }
 
-        // 2. Шукаємо користувача в базі даних
         const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
-        // Якщо користувача не знайдено
         if (userResult.rows.length === 0) {
             return res.status(401).json({ error: "Невірний email або пароль" });
         }
 
         const user = userResult.rows[0];
 
-        // 3. Перевіряємо пароль (порівнюємо введений пароль з хешем у базі)
+        if (user.banned) {
+            const banDate = new Date(user.banned_time).toLocaleString('uk-UA');
+            return res.status(403).json({ error: `Ваш акаунт було заблоковано адміністратором (${banDate}). Зверніться до підтримки.` });
+        }
+
         const validPassword = await bcrypt.compare(password, user.password_hash);
 
         if (!validPassword) {
             return res.status(401).json({ error: "Невірний email або пароль" });
         }
 
-        // 4. Відправляємо успішну відповідь
-        // Frontend очікує: { message, user_id, role, name }
+        const token = jwt.sign(
+            { user_id: user.user_id, role: user.role },
+            JWT_SECRET, // (цей секрет у тебе вже є на початку файлу)
+            { expiresIn: '24h' }
+        );
+
         res.json({
-            user_id: user.user_id,
-            name: user.full_name,
-            role: user.role,
-            email: user.email,
-            avatar: user.avatar,
-            phone: user.phone
+            token: token,
+            user: {
+                user_id: user.user_id,
+                name: user.full_name,
+                role: user.role,
+                email: user.email,
+                avatar: user.avatar,
+                phone: user.phone
+            }
         });
 
     } catch (err) {
@@ -310,9 +352,33 @@ app.get('/api/maps/:name', async (req, res) => {
     }
 });
 
+// 3. ОТРИМАТИ СПИСОК УСІХ КІМНАТ (КАРТ)
+app.get('/api/maps', async (req, res) => {
+    try {
+        // Витягуємо лише імена карт (без важкого JSON-об'єкта з фігурами)
+        const result = await pool.query("SELECT name, updated_at FROM maps ORDER BY updated_at DESC");
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Помилка отримання списку карт:', error);
+        res.status(500).json({ error: 'Помилка сервера' });
+    }
+});
+
+// 4. ВИДАЛИТИ КІМНАТУ
+app.delete('/api/maps/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        await pool.query("DELETE FROM maps WHERE name = $1", [name]);
+        res.status(200).json({ message: 'Кімнату успішно видалено' });
+    } catch (error) {
+        console.error('Помилка видалення карти:', error);
+        res.status(500).json({ error: 'Помилка сервера' });
+    }
+});
+
 
 // GET USER PROFILE BY ID
-app.get('/api/user/:id', async (req, res) => {
+app.get('/api/user/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
@@ -334,7 +400,7 @@ app.get('/api/user/:id', async (req, res) => {
 // ==========================================
 // МАРШРУТ ОНОВЛЕННЯ ПРОФІЛЮ КОРИСТУВАЧА (PUT)
 // ==========================================
-app.put('/api/user/:id', async (req, res) => {
+app.put('/api/user/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { name, phone, currentPassword, newPassword } = req.body;
 
@@ -400,7 +466,7 @@ app.put('/api/user/:id', async (req, res) => {
 // ==========================================
 // МАРШРУТ ВИДАЛЕННЯ АКАУНТА (DELETE)
 // ==========================================
-app.delete('/api/user/:id', async (req, res) => {
+app.delete('/api/user/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -426,7 +492,7 @@ app.delete('/api/user/:id', async (req, res) => {
 // ==========================================
 // МАРШРУТ ЗАВАНТАЖЕННЯ АВАТАРА (POST)
 // ==========================================
-app.post('/api/user/:id/avatar', upload.single('avatar'), async (req, res) => {
+app.post('/api/user/:id/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -463,8 +529,7 @@ app.post('/api/user/:id/avatar', upload.single('avatar'), async (req, res) => {
 // ==========================================
 
 // 1. СТВОРЕННЯ БРОНЮВАННЯ
-// 1. СТВОРЕННЯ БРОНЮВАННЯ
-app.post('/api/bookings', async (req, res) => {
+app.post('/api/bookings', authenticateToken, async (req, res) => {
     try {
         const { user_id, seat_id, seat_label, booking_date, start_time, duration_hours, total_price, extras } = req.body;
 
@@ -508,7 +573,7 @@ app.post('/api/bookings', async (req, res) => {
 });
 
 // 2. ОТРИМАННЯ БРОНЮВАНЬ КОРИСТУВАЧА
-app.get('/api/user/:id/bookings', async (req, res) => {
+app.get('/api/user/:id/bookings', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const bookings = await pool.query(
@@ -525,7 +590,7 @@ app.get('/api/user/:id/bookings', async (req, res) => {
 // ==========================================
 // ОТРИМАННЯ ЗАЙНЯТИХ МІСЦЬ ДЛЯ КАРТИ
 // ==========================================
-app.get('/api/bookings/occupied', async (req, res) => {
+app.get('/api/bookings/occupied', authenticateToken, async (req, res) => {
     try {
         const { date, start_time, duration_hours } = req.query;
 
@@ -559,8 +624,7 @@ app.get('/api/bookings/occupied', async (req, res) => {
 // ==========================================
 
 // 1. Отримати список всіх користувачів
-// 1. Отримати список всіх користувачів (ОНОВЛЕНО: додано нові колонки)
-app.get('/api/admin/users', async (req, res) => {
+app.get('/api/admin/users', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query(
             // Додали banned та banned_time
@@ -574,7 +638,7 @@ app.get('/api/admin/users', async (req, res) => {
 });
 
 // 2. Видалити користувача (Адмін)
-app.delete('/api/admin/users/:id', async (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
@@ -586,7 +650,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 });
 
 // 3. НОВИЙ МАРШРУТ: Забанити / Розбанити користувача
-app.patch('/api/admin/users/:id/ban', async (req, res) => {
+app.patch('/api/admin/users/:id/ban', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { banned } = req.body; // Отримуємо бажаний статус: true або false
 
@@ -614,6 +678,156 @@ app.patch('/api/admin/users/:id/ban', async (req, res) => {
 
     } catch (err) {
         console.error("Помилка зміни статусу бану:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 4. Отримати статистику конкретного користувача
+app.get('/api/admin/users/:id/stats', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const statsQuery = `
+            SELECT 
+                COUNT(*) as total_bookings,
+                COUNT(*) FILTER (WHERE status = 'active') as active_bookings,
+                COALESCE(SUM(total_price), 0) as total_spent
+            FROM bookings
+            WHERE user_id = $1
+        `;
+        const result = await pool.query(statsQuery, [id]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Помилка отримання статистики користувача:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 5. Оновити дані користувача (Адмін)
+app.put('/api/admin/users/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { full_name, phone, role } = req.body;
+
+        const result = await pool.query(
+            "UPDATE users SET full_name = $1, phone = $2, role = $3 WHERE user_id = $4 RETURNING *",
+            [full_name, phone, role, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Користувача не знайдено" });
+        }
+
+        res.json({ message: "Дані користувача оновлено", user: result.rows[0] });
+    } catch (err) {
+        console.error("Помилка оновлення користувача:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 6. Отримання загальної статистики
+app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { startDate, endDate, seatId } = req.query;
+
+        // Базові параметри для запиту
+        let values = [startDate, endDate];
+        let seatFilter = seatId ? `AND seat_id = $3` : '';
+        if (seatId) values.push(seatId);
+
+        // 1. Запит для загальних підсумків
+        const summaryQuery = `
+            SELECT 
+                COUNT(booking_id) as total_bookings,
+                COALESCE(SUM(total_price), 0) as total_revenue,
+                COUNT(CASE WHEN status = 'active' THEN 1 END) as active_bookings,
+                COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_bookings
+            FROM bookings
+            WHERE booking_date >= $1 AND booking_date <= $2 ${seatFilter}
+        `;
+        const summaryResult = await pool.query(summaryQuery, values);
+
+        // 2. Запит для розбивки по днях (щоб намалювати графік)
+        const dailyQuery = `
+            SELECT 
+                TO_CHAR(booking_date, 'YYYY-MM-DD') as date,
+                COUNT(booking_id) as daily_bookings,
+                COALESCE(SUM(total_price), 0) as daily_revenue
+            FROM bookings
+            WHERE booking_date >= $1 AND booking_date <= $2 ${seatFilter}
+            GROUP BY booking_date
+            ORDER BY booking_date ASC
+        `;
+        const dailyResult = await pool.query(dailyQuery, values);
+
+        res.json({
+            summary: summaryResult.rows[0],
+            daily: dailyResult.rows
+        });
+    } catch (err) {
+        console.error("Помилка отримання статистики:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 7. Отримання всіх бронювань з гнучкою фільтрацією
+app.get('/api/admin/bookings', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        // Додали параметр timeframe
+        const { date, status, timeframe } = req.query;
+
+        let query = `
+            SELECT b.*, u.full_name, u.email, u.phone 
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.user_id
+            WHERE 1=1
+        `;
+        const values = [];
+        let valueIndex = 1;
+
+        // Логіка періоду
+        if (timeframe === 'past') {
+            query += ` AND b.booking_date < CURRENT_DATE`;
+        } else if (timeframe === 'upcoming') {
+            query += ` AND b.booking_date >= CURRENT_DATE`;
+        } else if (timeframe === 'specific' && date) {
+            query += ` AND b.booking_date = $${valueIndex}`;
+            values.push(date);
+            valueIndex++;
+        }
+        // Якщо timeframe === 'all', ми просто не додаємо умов по даті
+
+        if (status && status !== 'all') {
+            query += ` AND b.status = $${valueIndex}`;
+            values.push(status);
+            valueIndex++;
+        }
+
+        query += ` ORDER BY b.booking_date DESC, b.start_time DESC`;
+
+        const result = await pool.query(query, values);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Помилка отримання бронювань:", err.message);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// 8. Скасування бронювання (Адміном)
+app.patch('/api/admin/bookings/:id/cancel', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "UPDATE bookings SET status = 'cancelled' WHERE booking_id = $1 RETURNING *",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Бронювання не знайдено" });
+        }
+
+        res.json({ message: "Бронювання скасовано", booking: result.rows[0] });
+    } catch (err) {
+        console.error("Помилка скасування бронювання:", err.message);
         res.status(500).json({ error: "Помилка сервера" });
     }
 });

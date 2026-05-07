@@ -7,26 +7,38 @@ import AdminEditor from './pages/AdminRoomEditor.jsx'
 import RoomMapClient from './pages/RoomMapClient.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 
-
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/user-page" element={<UserPage />} />
-        <Route path="/book-map" element={<RoomMapClient />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route
-          path="/admin/editor"
-          element={
-            <AdminEditor />
-          }
-        />
-        <Route path="/" element={<MainPage />} />
-      </Routes>
-    </Router>
+    <div className="font-sans text-gray-900 antialiased">
+      {/* 2. Додаємо контейнер на рівні всього додатку */}
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light" // Можна зробити 'colored' або 'dark'
+      />
+
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/user-page" element={<UserPage />} />
+          <Route path="/book-map" element={<RoomMapClient />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/editor/:roomName" element={<AdminEditor />} />
+          <Route path="/" element={<MainPage />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }
 

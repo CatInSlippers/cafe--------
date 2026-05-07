@@ -26,6 +26,7 @@
     "react-hook-form": "^7.75.0",
     "react-konva": "^19.2.1",
     "react-router-dom": "^7.11.0",
+    "react-toastify": "^11.1.0",
     "selenium-webdriver": "^4.41.0",
     "yup": "^1.7.1"
   }

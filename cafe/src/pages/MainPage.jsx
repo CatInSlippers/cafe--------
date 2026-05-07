@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import MainPageHeader from "../assets/BiggerFish/MainPageHeader";
 import { FiCheckCircle, FiCircle, FiMapPin, FiCalendar, FiUser, FiUsers, FiCoffee, FiMonitor, FiBriefcase, FiClock } from "react-icons/fi";
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // 1. Словник типів місць (відповідає типам фігур на карті)
 const SPACE_TYPES = [
@@ -32,14 +33,16 @@ function MainPage() {
     // Якщо ми повернулися з карти, тут буде об'єкт обраного місця
     const [selectedSeat, setSelectedSeat] = useState(location.state?.selectedSeat || null);
 
-    // Стейт для Кроку 1 (Вибір категорії)
+    // Вибір категорії
     const [selectedCategory, setSelectedCategory] = useState(SPACE_TYPES[0]);
 
-    // Стейт для Кроку 3 (Налаштування часу та послуг)
+    // Налаштування часу та послуг
     const [date, setDate] = useState(location.state?.date || new Date().toISOString().split('T')[0]);
     const [startTime, setStartTime] = useState(location.state?.startTime || '10:00');
     const [hours, setHours] = useState(location.state?.hours || 1);
     const [selectedExtras, setSelectedExtras] = useState([]);
+
+    const [selectedRoom, setSelectedRoom] = useState(location.state?.room || '');
 
 
     useEffect(() => {
@@ -66,7 +69,7 @@ function MainPage() {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
-        location.reload();
+        window.location.reload();
     };
 
     const toggleExtra = (id) => {
@@ -84,7 +87,7 @@ function MainPage() {
 
     const handleConfirmBooking = async () => {
         if (!user) {
-            alert("Будь ласка, увійдіть в акаунт.");
+            toast.warning("Будь ласка, увійдіть в акаунт, щоб забронювати місце.");
             navigate('/login');
             return;
         }
@@ -97,32 +100,35 @@ function MainPage() {
                 EXTRA_SERVICES.find(e => e.id === extId).label
             );
 
+            const seatLabelRaw = selectedSeat ? (selectedSeat.label || selectedSeat.type) : selectedCategory.title;
+            const finalSeatLabel = selectedRoom ? `${seatLabelRaw} (${selectedRoom})` : seatLabelRaw;
+
             const bookingData = {
                 user_id: userId,
                 seat_id: selectedSeat ? selectedSeat.id : selectedCategory.id,
-                seat_label: selectedSeat ? (selectedSeat.label || selectedSeat.type) : selectedCategory.title,
+                seat_label: finalSeatLabel,
                 booking_date: date,
                 start_time: startTime,
                 duration_hours: hours,
                 total_price: totalAmount,
-                extras: extrasLabels // Додаємо масив послуг
+                extras: extrasLabels
             };
 
             const response = await axios.post('http://localhost:3005/api/bookings', bookingData);
 
             if (response.status === 201) {
-                const extrasText = extrasLabels.length > 0 ? `\nДод. послуги: ${extrasLabels.join(', ')}` : '';
-                alert(`Бронювання успішне!\n\nМісце: ${bookingData.seat_label}\nДата: ${date}\nЧас початку: ${startTime}\nТривалість: ${hours} год.${extrasText}\nСума: ${totalAmount} грн`); navigate('/user-page');
+                toast.success(`Бронювання успішне!`);
+                navigate('/user-page');
             }
         } catch (error) {
             console.error("Помилка при бронюванні:", error);
 
             // Якщо сервер повернув нашу конкретну помилку (наприклад, про зайнятий стіл)
             if (error.response && error.response.data && error.response.data.error) {
-                alert(error.response.data.error);
+                toast.error(error.response.data.error);
             } else {
                 // Якщо сервер впав або немає зв'язку
-                alert("Не вдалося створити бронювання. Спробуйте ще раз.");
+                toast.error("Не вдалося створити бронювання. Спробуйте ще раз.");
             }
         }
     };
@@ -274,10 +280,16 @@ function MainPage() {
                                 <>
                                     <div className="mb-6 space-y-4">
                                         <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <FiMapPin className="text-purple-500" /> Місце
+                                            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                                <div className="flex items-center gap-2 text-gray-600">
+                                                    <FiMapPin className="text-purple-500" />
+                                                    <span>Обране місце</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="font-bold text-gray-900">{selectedSeat.label || 'Робоче місце'}</div>
+                                                    {selectedRoom && <div className="text-xs text-gray-500">{selectedRoom.replace(/_/g, ' ')}</div>}
+                                                </div>
                                             </div>
-                                            <span className="font-bold text-gray-900">{selectedSeat.label || 'Без назви'}</span>
                                         </div>
                                         <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                                             <div className="flex items-center gap-2 text-gray-600">

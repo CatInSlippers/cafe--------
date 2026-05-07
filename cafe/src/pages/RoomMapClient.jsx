@@ -122,6 +122,9 @@ const RoomMapClient = () => {
     const [loading, setLoading] = useState(true);
     const stageRef = useRef(null);
 
+    const [rooms, setRooms] = useState([]);
+    const [selectedRoom, setSelectedRoom] = useState('');
+
     const [stageState, setStageState] = useState({
         scale: 1, pos: { x: 0, y: 0 }, size: { w: window.innerWidth, h: window.innerHeight }
     });
@@ -141,19 +144,44 @@ const RoomMapClient = () => {
         fetchOccupiedSeats();
     }, [date, startTime, hours]); // Запускається щоразу, коли змінюється дата або час
 
+    // 1. Завантажуємо список усіх доступних кімнат
     useEffect(() => {
-        const loadMap = async () => {
+        const fetchRooms = async () => {
             try {
-                const response = await fetch('http://localhost:3005/api/maps/main_hall');
+                const response = await fetch('http://localhost:3005/api/maps');
+                if (response.ok) {
+                    const data = await response.json();
+                    setRooms(data);
+                    if (data.length > 0) {
+                        setSelectedRoom(data[0].name); // Вибираємо першу кімнату за замовчуванням
+                    } else {
+                        setLoading(false); // Якщо кімнат немає, просто зупиняємо лоадер
+                    }
+                }
+            } catch (error) { console.error("Помилка завантаження списку кімнат:", error); }
+        };
+        fetchRooms();
+    }, []);
+
+    // 2. Завантажуємо об'єкти карти, коли змінюється обрана кімната
+    useEffect(() => {
+        if (!selectedRoom) return;
+
+        const loadMap = async () => {
+            setLoading(true);
+            try {
+                const response = await fetch(`http://localhost:3005/api/maps/${selectedRoom}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (Array.isArray(data)) setShapes(data);
+                } else {
+                    setShapes([]);
                 }
-            } catch (error) { console.error("Помилка:", error); }
+            } catch (error) { console.error("Помилка завантаження карти:", error); }
             finally { setLoading(false); }
         };
         loadMap();
-    }, []);
+    }, [selectedRoom]);
 
     useEffect(() => {
         const handleResize = () => setStageState(prev => ({ ...prev, size: { w: window.innerWidth, h: window.innerHeight } }));
@@ -184,9 +212,8 @@ const RoomMapClient = () => {
         if (shape.status === 'booked') return alert('Це місце вже зайняте.');
         if (shape.status === 'broken') return alert('Це місце тимчасово недоступне.');
 
-        if (window.confirm(`Бронюємо "${shape.label || 'Робоче місце'}"?`)) {
-            // Передаємо не лише стіл, а й обраний час!
-            navigate('/', { state: { selectedSeat: shape, date, startTime, hours } });
+        if (window.confirm(`Бронюємо "${shape.label || 'Робоче місце'}" у кімнаті "${selectedRoom}"?`)) {
+            navigate('/', { state: { selectedSeat: shape, date, startTime, hours, room: selectedRoom } });
         }
     };
 
@@ -202,6 +229,26 @@ const RoomMapClient = () => {
                 >
                     <FiArrowLeft /> Назад
                 </button>
+                {/* Перемикач кімнат */}
+                {rooms.length > 0 && (
+                    <div className="mb-4 border-b border-gray-100 pb-4">
+                        <label className="text-xs font-bold text-gray-500 block mb-2 uppercase tracking-wider">Оберіть зону</label>
+                        <div className="flex flex-wrap gap-2">
+                            {rooms.map(r => (
+                                <button
+                                    key={r.name}
+                                    onClick={() => setSelectedRoom(r.name)}
+                                    className={`px-3 py-1.5 text-sm font-bold rounded-lg transition-colors shadow-sm ${selectedRoom === r.name
+                                            ? 'bg-[var(--day-purple)] text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {r.name.replace(/_/g, ' ')} {/* Замінюємо підкреслення на пробіли для краси */}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Панель вибору часу */}
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mb-4 space-y-3">

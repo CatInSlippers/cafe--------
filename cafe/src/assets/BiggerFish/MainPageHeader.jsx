@@ -7,6 +7,7 @@ function MainPageHeader({ user, setIsOpen, setUser, isOpen, navigate, isSettings
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <Logo />
             <SearchBar
+                wrapperClass="max-w-md mx-8 hidden md:block"
                 placeholder="Пошук послуги або місця..." />
             {user
                 ?

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Circle, Text, Transformer, Group, Arc, Line, Path } from 'react-konva';
+import {useParams } from 'react-router-dom';
 
 // Icons
 import { BiTrash, BiDoorOpen, BiPlug, BiStats, BiReset, BiCloudUpload, BiLoaderAlt } from 'react-icons/bi';
@@ -244,6 +245,8 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
 
 const AdminEditor = () => {
     const navigate = useNavigate();
+    const { roomName } = useParams();
+
     const [shapes, setShapes] = useState(() => {
         try {
             const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -291,7 +294,7 @@ const AdminEditor = () => {
             const response = await fetch('http://localhost:3005/api/maps', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: "main_hall", objects: shapes })
+                body: JSON.stringify({ name: roomName, objects: shapes })
             });
 
             if (!response.ok) throw new Error('Помилка збереження');
@@ -307,15 +310,15 @@ const AdminEditor = () => {
     useEffect(() => {
         const loadMap = async () => {
             try {
-                const response = await fetch('http://localhost:3005/api/maps/main_hall');
+                const response = await fetch(`http://localhost:3005/api/maps/${roomName}`); // <--- Використовуємо roomName
                 if (response.ok) {
                     const data = await response.json();
                     if (Array.isArray(data)) setShapes(data);
                 }
-            } catch (error) { console.error("Помилка з'єднання з сервером:", error); }
+            } catch (error) { console.error("Помилка:", error); }
         };
         loadMap();
-    }, []);
+    }, [roomName]);
 
     useEffect(() => {
         const handleResize = () => setStageState(prev => ({ ...prev, size: { w: window.innerWidth, h: window.innerHeight } }));
