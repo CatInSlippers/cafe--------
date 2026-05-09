@@ -24,11 +24,13 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + path.extname(file.originalname));
     }
 });
+exports.storage = storage;
 
 const upload = multer({ storage: storage });
-
+exports.upload = upload;
 
 const app = express();
+exports.app = app;
 const PORT = process.env.PORT || 3005;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -48,6 +50,7 @@ const pool = new Pool({
     port: 5432,
     max: 100,
 });
+exports.pool = pool;
 
 pool.connect((err) => {
     if (err) {
@@ -80,6 +83,7 @@ const authenticateToken = (req, res, next) => {
         next(); // Пропускаємо далі до маршруту
     });
 };
+exports.authenticateToken = authenticateToken;
 
 // 2. Перевірка, чи є користувач Адміністратором
 const isAdmin = (req, res, next) => {
@@ -131,9 +135,6 @@ app.post('/register', async (req, res) => {
 });
 
 // ==========================================
-// МАРШРУТ ВХОДУ (LOGIN) - Це знадобиться наступним кроком
-// ==========================================
-// ==========================================
 // МАРШРУТ ВХОДУ (LOGIN)
 // ==========================================
 app.post('/login', async (req, res) => {
@@ -184,115 +185,6 @@ app.post('/login', async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server Error");
-    }
-});
-
-// ==========================================
-// МАРШРУТ ЗАПИТУ НА ВІДНОВЛЕННЯ (/forgot-password)
-// ==========================================
-app.post('/forgot-password', async (req, res) => {
-    const { email } = req.body;
-
-    try {
-        // Перевірка, чи прийшов email
-        if (!email) {
-            return res.status(400).json({ error: "Введіть email" });
-        }
-
-        const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: "Користувача з таким email не знайдено" });
-        }
-
-        const user = userResult.rows[0];
-
-        // Створення токена
-        const secret = JWT_SECRET + user.password_hash;
-        const token = jwt.sign({ id: user.user_id, email: user.email }, secret, { expiresIn: '15m' });
-
-        // Використовуємо 127.0.0.1 замість localhost, іноді це вирішує проблеми мережі на Windows/Mac
-        const link = `http://localhost:5173/reset-password/${user.user_id}/${token}`;
-
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: 'timeguardtest7@gmail.com',
-                pass: process.env.EMAIL_PASS // Краще брати з .env файлу!
-            }
-        });
-
-        const mailOptions = {
-            from: 'TimeGuard Support <timeguardtest7@gmail.com>',
-            to: email,
-            subject: 'Відновлення пароля TimeGuard',
-            html: `
-                <h3>Відновлення пароля</h3>
-                <p>Ви отримали цей лист, бо надіслали запит на відновлення пароля.</p>
-                <p>Натисніть на кнопку нижче, щоб змінити пароль (посилання діє 15 хв):</p>
-                <a href="${link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Змінити пароль</a>
-                <p>Або перейдіть за посиланням: <br/>${link}</p>
-            `
-        };
-
-        // Додаємо await, щоб зловити помилку саме тут, якщо вона є
-        const info = await transporter.sendMail(mailOptions);
-
-        console.log(`Email надіслано: ${info.response}`);
-        console.log(`Посилання (DEBUG): ${link}`);
-
-        res.json({ message: "Посилання на відновлення надіслано на пошту" });
-
-    } catch (error) {
-        console.error("ПОМИЛКА SENDMAIL:", error); // Детальний вивід помилки
-        res.status(500).json({ error: "Помилка сервера при відправці пошти", details: error.message });
-    }
-});
-
-// ==========================================
-// МАРШРУТ ЗМІНИ ПАРОЛЯ (/reset-password)
-// ==========================================
-// Цей маршрут викликається, коли користувач вже ввів новий пароль на сторінці
-app.post('/reset-password/:id/:token', async (req, res) => {
-    const { id, token } = req.params;
-    const { password } = req.body; // Новий пароль
-
-    try {
-        // 1. Знаходимо користувача в БД, щоб отримати його старий хеш пароля для перевірки
-        const userResult = await pool.query("SELECT * FROM users WHERE user_id = $1", [id]);
-
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: "Користувача не знайдено" });
-        }
-
-        const user = userResult.rows[0];
-
-        // 2. Перевіряємо токен
-        // Ми використовуємо той самий секрет (JWT_SECRET + старий хеш), щоб розшифрувати токен
-        const secret = JWT_SECRET + user.password_hash;
-
-        try {
-            const verify = jwt.verify(token, secret);
-            // Якщо verify пройшов успішно, токен валідний і час не вийшов
-        } catch (err) {
-            return res.status(400).json({ error: "Посилання недійсне або застаріло" });
-        }
-
-        // 3. Хешуємо НОВИЙ пароль
-        const salt = await bcrypt.genSalt(10);
-        const encryptedPassword = await bcrypt.hash(password, salt);
-
-        // 4. Оновлюємо пароль у базі даних
-        await pool.query(
-            "UPDATE users SET password_hash = $1 WHERE user_id = $2",
-            [encryptedPassword, id]
-        );
-
-        res.json({ message: "Пароль успішно змінено! Тепер ви можете увійти." });
-
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Помилка сервера" });
     }
 });
 
@@ -375,7 +267,6 @@ app.delete('/api/maps/:name', async (req, res) => {
         res.status(500).json({ error: 'Помилка сервера' });
     }
 });
-
 
 // GET USER PROFILE BY ID
 app.get('/api/user/:id', authenticateToken, async (req, res) => {
