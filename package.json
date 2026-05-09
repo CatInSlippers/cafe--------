@@ -2,9 +2,9 @@
   "name": "cafe",
   "version": "1.0.0",
   "description": "",
-  "main": "server2.js",
+  "main": "server.js",
   "scripts": {
-    "start": "nodemon server/server2.js",
+    "start": "nodemon server/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

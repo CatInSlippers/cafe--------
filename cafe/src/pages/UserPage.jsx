@@ -4,9 +4,9 @@ import {
     FiCalendar, FiClock, FiMapPin, FiCreditCard,
     FiSettings, FiLogOut, FiArrowLeft, FiPlus
 } from 'react-icons/fi';
-import axios from 'axios';
 import { Logo } from '../assets/Blocks/Logo';
 import UserIcon from '../assets/Blocks/UserIcon';
+import axios from '../api/axios';
 
 const UserPage = () => {
     const navigate = useNavigate();

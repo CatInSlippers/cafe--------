@@ -45,8 +45,13 @@ export default function Right({ type }) {
         else if (type === 'login') {
             try {
                 const response = await axios.post('http://localhost:3005/login', formData);
-                const userData = response.data; // { message, user_id, role, name }
+
+                const token = response.data.token;
+                const userData = response.data.user;
+
+                localStorage.setItem('token', token);
                 localStorage.setItem('user', JSON.stringify(userData));
+
                 alert(`Вітаємо, ${userData.name}! Ви успішно увійшли.`);
                 console.log("Logged in user:", userData);
                 window.location.href = '/';

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import MainPageHeader from "../assets/BiggerFish/MainPageHeader";
-import { FiCheckCircle, FiCircle, FiMapPin, FiCalendar, FiUser, FiUsers, FiCoffee, FiMonitor, FiBriefcase, FiClock } from "react-icons/fi";
-import axios from 'axios';
+import { FiCheckCircle, FiPhone, FiCircle, FiMapPin, FiCalendar, FiUser, FiUsers, FiCoffee, FiMonitor, FiBriefcase, FiClock } from "react-icons/fi";
+import axios from '../api/axios';
 import { toast } from 'react-toastify';
 
 // 1. Словник типів місць (відповідає типам фігур на карті)
@@ -142,13 +142,13 @@ function MainPage() {
     const totalAmount = (basePrice * hours) + extrasTotal;
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans pb-12">
+        <div className="min-h-screen bg-[var(--day-pink)] dark:bg-[var(--night-dark-purple)] font-sans flex flex-col">
             <MainPageHeader
                 user={user} setIsOpen={setIsOpen} setUser={setUser} isOpen={isOpen} navigate={navigate}
                 isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleLogout={handleLogout}
             />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex flex-col lg:flex-row gap-8">
 
                     {/* ЛІВА КОЛОНКА: ДИНАМІЧНА (Залежить від того, чи обрано місце) */}
@@ -342,7 +342,53 @@ function MainPage() {
                     </div>
                 </div>
             </main>
+            <Footer />
         </div>
+
+    );
+
+}
+
+
+// Вставляємо цей компонент знизу файлу MainPage.jsx
+function Footer() {
+    return (
+        <footer className="bg-gray-900 text-gray-300 py-12 mt-20 border-t border-gray-800 w-full">
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 className="text-white text-xl font-bold mb-4 tracking-wider flex items-center gap-2">
+                        <span className="text-purple-500">Time</span>Guard
+                    </h3>
+                    <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                        Сучасний простір для вашої продуктивності. Гнучкі робочі місця, комфортні переговорні кімнати та безперебійний інтернет для реалізації найсміливіших ідей.
+                    </p>
+                </div>
+                <div>
+                    <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Контакти</h4>
+                    <ul className="space-y-3 text-sm">
+                        <li className="flex items-start gap-3 hover:text-purple-400 transition">
+                            <FiMapPin className="mt-1 text-purple-500 shrink-0" />
+                            <span>вул. Незалежності, 42<br />м. Івано-Франківськ, 76000</span>
+                        </li>
+                        <li className="flex items-center gap-3 hover:text-purple-400 transition">
+                            <FiPhone className="text-purple-500 shrink-0" />
+                            <span>+38 (050) 123-45-67</span>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Графік роботи</h4>
+                    <ul className="space-y-3 text-sm">
+                        <li className="flex justify-between border-b border-gray-800 pb-2">
+                            <span>Пн - Пт</span><span className="font-medium text-white">08:00 - 22:00</span>
+                        </li>
+                        <li className="flex justify-between">
+                            <span>Сб - Нд</span><span className="font-medium text-purple-400">10:00 - 20:00</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </footer>
     );
 }
 

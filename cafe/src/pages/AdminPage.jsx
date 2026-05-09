@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../api/axios';
 import { FiUsers, FiBarChart2, FiCalendar, FiMap, FiLogOut, FiTrash2, FiEdit, FiSlash, FiX, FiCheck, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import { SearchBar } from '../assets/Blocks/SearchBar';
 import { toast } from 'react-toastify';
@@ -472,11 +472,11 @@ const AdminPage = () => {
                                         <div className="text-3xl font-black text-gray-800">{statsData.summary.total_bookings || 0}</div>
                                     </div>
                                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                                        <div className="text-gray-400 text-sm font-bold uppercase mb-2 text-green-500">Активних</div>
+                                        <div className=" text-sm font-bold uppercase mb-2 text-green-500">Активних</div>
                                         <div className="text-3xl font-black text-gray-800">{statsData.summary.active_bookings || 0}</div>
                                     </div>
                                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                                        <div className="text-gray-400 text-sm font-bold uppercase mb-2 text-red-500">Скасованих</div>
+                                        <div className="text-sm font-bold uppercase mb-2 text-red-500">Скасованих</div>
                                         <div className="text-3xl font-black text-gray-800">{statsData.summary.cancelled_bookings || 0}</div>
                                     </div>
                                 </div>

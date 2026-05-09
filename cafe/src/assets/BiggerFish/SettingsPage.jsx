@@ -5,6 +5,8 @@ import { Slider } from '../Blocks/Slider';
 import { MenuButton } from '../Blocks/MenuButton';
 import InputField from '../Blocks/InputField';
 import PasswordToggleInput from '../Blocks/PasswordToggleInput';
+import axios from '../../api/axios';
+
 
 export default function SettingsModal({ isOpen, onClose, user }) {
     const [activeTab, setActiveTab] = useState('general');

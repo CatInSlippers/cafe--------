@@ -16,8 +16,7 @@ const COLORS = {
     FURNITURE_DEFAULT: '#E0E7FF', FURNITURE_STROKE: '#4338CA', SOCKET: '#F59E0B', TEXT: '#1F2937', TOILET_BG: '#F3F4F6'
 };
 
-const BOOKABLE = ['desk', 'meeting_table', 'round_table', 'sofa'];
-
+const BOOKABLE = ['desk', 'meeting_table', 'round_table', 'sofa', 'private_room'];
 function getFillColor(props) {
     if (!props.status) return props.fill || COLORS.FURNITURE_DEFAULT;
     switch (props.status) {
@@ -77,6 +76,12 @@ const ClientShapeComponent = React.memo(({ shapeProps, onBook, categoryFilter })
                         <ChairsRenderer color={COLORS} seats={shapeProps.seats} type={shapeProps.type} radius={r} stroke={stroke} />
                         <Circle radius={r} fill={fill} stroke={stroke} />
                         <SocketIcon colors={COLORS} hasSocket={shapeProps.hasSocket} type={shapeProps.type} />
+                    </Group>
+                );
+            case 'private_room':
+                return (
+                    <Group>
+                        <Rect width={w} height={h} fill={fill} stroke={stroke} strokeWidth={3} dash={[8, 8]} cornerRadius={8} />
                     </Group>
                 );
             default: return <Rect width={w} height={h} fill={fill} stroke={stroke} />;
@@ -239,8 +244,8 @@ const RoomMapClient = () => {
                                     key={r.name}
                                     onClick={() => setSelectedRoom(r.name)}
                                     className={`px-3 py-1.5 text-sm font-bold rounded-lg transition-colors shadow-sm ${selectedRoom === r.name
-                                            ? 'bg-[var(--day-purple)] text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-[var(--day-purple)] text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {r.name.replace(/_/g, ' ')} {/* Замінюємо підкреслення на пробіли для краси */}

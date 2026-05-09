@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Circle, Text, Transformer, Group, Arc, Line, Path } from 'react-konva';
-import {useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 // Icons
 import { BiTrash, BiDoorOpen, BiPlug, BiStats, BiReset, BiCloudUpload, BiLoaderAlt } from 'react-icons/bi';
@@ -61,14 +61,15 @@ const SHAPE_CONFIGS = {
     coffee: { width: 40, height: 40, label: '', fill: '#78350F' },
     water: { radius: 20, label: '', fill: '#3B82F6' },
     whiteboard: { width: 120, height: 10, label: '', fill: '#FFFFFF' },
-    text_label: { width: 160, height: 40, label: 'Назва зони', fontSize: 24, fill: 'transparent' }
+    text_label: { width: 160, height: 40, label: 'Назва зони', fontSize: 24, fill: 'transparent' },
+    private_room: { width: 200, height: 150, label: 'Переговорна', fill: '#FEF3C7', opacity: 0.6 },
 };
 
 const DEFAULT_STATE = [
     { id: 'desk1', type: 'desk', x: 150, y: 150, width: 120, height: 60, status: 'free', label: 'M-01', seats: 1, hasSocket: true },
 ];
 
-const BOOKABLE = ['desk', 'meeting_table', 'round_table', 'sofa'];
+const BOOKABLE = ['desk', 'meeting_table', 'round_table', 'sofa', 'private_room'];
 const STATES_TYPES = [
     { value: 'free', label: 'Вільно', color: COLORS.STATUS_FREE },
     { value: 'booked', label: 'Заброньовано', color: COLORS.STATUS_BOOKED },
@@ -168,6 +169,12 @@ const ShapeComponent = React.memo(({ shapeProps, isSelected, onSelect, onChange 
                         <ChairsRenderer color={COLORS} seats={shapeProps.seats} type={shapeProps.type} radius={r} stroke={stroke} />
                         <Circle radius={r} fill={fill} stroke={stroke} />
                         <SocketIcon colors={COLORS} hasSocket={shapeProps.hasSocket} type={shapeProps.type} />
+                    </Group>
+                );
+            case 'private_room':
+                return (
+                    <Group>
+                        <Rect width={w} height={h} fill={fill} stroke={stroke} strokeWidth={3} dash={[8, 8]} cornerRadius={8} />
                     </Group>
                 );
             default: return <Rect width={w} height={h} fill={fill} stroke={stroke} />;
@@ -620,6 +627,7 @@ const AdminEditor = () => {
                             <ToolCard icon={MdTableRestaurant} label="Стіл для нарад" onClick={() => addShape('meeting_table')} />
                             <ToolCard icon={MdTableBar} label="Круглий стіл" onClick={() => addShape('round_table')} />
                             <ToolCard icon={MdWeekend} label="Диван" onClick={() => addShape('sofa')} />
+                                <ToolCard icon={BiDoorOpen} label="Кімната" onClick={() => addShape('private_room')} />
                         </div>
                     </div>
                     <div>
