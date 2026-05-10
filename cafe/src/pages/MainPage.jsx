@@ -1,19 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
-import MainPageHeader from "../assets/BiggerFish/MainPageHeader";
-import { FiCheckCircle, FiPhone, FiCircle, FiMapPin, FiCalendar, FiUser, FiUsers, FiCoffee, FiMonitor, FiBriefcase, FiClock } from "react-icons/fi";
 import axios from '../api/axios';
 import { toast } from 'react-toastify';
+import { FiUser, FiUsers, FiCircle, FiCoffee, FiMonitor, FiBriefcase, FiArrowLeft } from "react-icons/fi";
 
-// 1. Словник типів місць (відповідає типам фігур на карті)
+// Імпорт компонентів
+import MainPageHeader from "../assets/BiggerFish/MainPageHeader";
+import { Footer } from "../components/Footer/Footer";
+import { ServiceCard } from "../components/MainPage/ServiceCard";
+import { BookingConfigurator } from "../components/MainPage/BookingConfigurator";
+import { OrderSummary } from "../components/MainPage/OrderSummary";
+
+// НОВІ КОМПОНЕНТИ
+import { ModeSelector } from "../components/MainPage/ModeSelector";
+import { RoomSelector } from "../components/MainPage/RoomSelector";
+import { QuickBookingBanner } from "../components/MainPage/QuickBookingBanner";
+
 const SPACE_TYPES = [
-    { id: 'desk', title: 'Робоче місце (Стіл)', icon: <FiUser className="text-2xl" />, description: 'Індивідуальне робоче місце. Доступ до розетки та швидкісного Wi-Fi.', basePrice: 50 },
-    { id: 'meeting_table', title: 'Переговорний стіл', icon: <FiUsers className="text-2xl" />, description: 'Простір для команди. Ідеально для мітів та колаборацій.', basePrice: 200 },
-    { id: 'round_table', title: 'Круглий стіл', icon: <FiCircle className="text-2xl" />, description: 'Стіл для обговорень та брейнштормів (до 4 осіб).', basePrice: 150 },
-    { id: 'sofa', title: 'Лаунж зона (Диван)', icon: <FiCoffee className="text-2xl" />, description: 'М\'яка зона для комфортної та розслабленої роботи.', basePrice: 80 },
+    { id: 'desk', title: 'Робоче місце (Стіл)', icon: <FiUser className="text-2xl" />, description: 'Індивідуальне робоче місце. Доступ до розетки.', basePrice: 50 },
+    { id: 'meeting_table', title: 'Переговорний стіл', icon: <FiUsers className="text-2xl" />, description: 'Простір для команди.', basePrice: 200 },
+    { id: 'round_table', title: 'Круглий стіл', icon: <FiCircle className="text-2xl" />, description: 'Стіл для обговорень (до 4 осіб).', basePrice: 150 },
+    { id: 'sofa', title: 'Лаунж зона (Диван)', icon: <FiCoffee className="text-2xl" />, description: 'М\'яка зона для комфортної роботи.', basePrice: 80 }
 ];
 
-// 2. Додаткові послуги
 const EXTRA_SERVICES = [
     { id: 'monitor', label: 'Додатковий монітор 27"', price: 50, icon: <FiMonitor /> },
     { id: 'coffee', label: 'Безлімітна кава/чай', price: 100, icon: <FiCoffee /> },
@@ -24,26 +33,22 @@ function MainPage() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Стейт користувача
     const [user, setUser] = useState(null);
     const [isOpen, setIsOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    // --- СТЕЙТИ БРОНЮВАННЯ ---
-    // Якщо ми повернулися з карти, тут буде об'єкт обраного місця
+    const [bookingMode, setBookingMode] = useState(
+        location.state?.mode || (location.state?.selectedSeat ? 'seat' : null)
+    );
+
     const [selectedSeat, setSelectedSeat] = useState(location.state?.selectedSeat || null);
-
-    // Вибір категорії
     const [selectedCategory, setSelectedCategory] = useState(SPACE_TYPES[0]);
-
-    // Налаштування часу та послуг
     const [date, setDate] = useState(location.state?.date || new Date().toISOString().split('T')[0]);
     const [startTime, setStartTime] = useState(location.state?.startTime || '10:00');
     const [hours, setHours] = useState(location.state?.hours || 1);
+    const [extraChairs, setExtraChairs] = useState(0);
     const [selectedExtras, setSelectedExtras] = useState([]);
-
     const [selectedRoom, setSelectedRoom] = useState(location.state?.room || '');
-
 
     useEffect(() => {
         const loadUser = async () => {
@@ -51,14 +56,13 @@ function MainPage() {
             if (storedUserStr) {
                 const storedUser = JSON.parse(storedUserStr);
                 setUser(storedUser);
-                const userId = storedUser.user_id || storedUser.id;
-                if (userId) {
+                if (storedUser.user_id || storedUser.id) {
                     try {
-                        const response = await axios.get(`http://localhost:3005/api/user/${userId}`);
+                        const response = await axios.get(`/api/user/${storedUser.user_id || storedUser.id}`);
                         const freshUserData = { ...storedUser, ...response.data };
                         setUser(freshUserData);
                         localStorage.setItem('user', JSON.stringify(freshUserData));
-                    } catch (error) { console.error("Помилка оновлення даних:", error); }
+                    } catch (error) { console.error(error); }
                 }
             }
         };
@@ -69,326 +73,149 @@ function MainPage() {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
         window.location.reload();
     };
 
-    const toggleExtra = (id) => {
-        setSelectedExtras(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
-    };
 
-    const handleGoToMap = () => {
-        navigate('/book-map', { state: { category: selectedCategory.id } });
-    };
-
-    const handleCancelSeat = () => {
+    const handleResetToHome = () => {
+        setBookingMode(null);
         setSelectedSeat(null);
-        navigate('/', { replace: true, state: {} }); // Очищаємо стейт роутера
+        setSelectedRoom('');
+        navigate('/', { replace: true, state: {} });
+    };
+
+    const toggleExtra = (id) => setSelectedExtras(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
+
+    // Перехід на карту для стола
+    const handleGoToMap = () => navigate('/book-map', { state: { category: selectedCategory.id, mode: 'seat' } });
+
+    // Вибір всієї кімнати
+    const handleRoomSelect = (room) => {
+        setSelectedRoom(room.name);
+        setSelectedSeat({
+            id: `room_${room.name}`,
+            type: 'private_room',
+            label: `Кімната: ${room.name.replace(/_/g, ' ')}`,
+            basePrice: 400 // Базова ціна оренди кімнати
+        });
+    };
+
+    // Логіка швидкого бронювання
+    const handleQuickBook = (pastBooking) => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setDate(tomorrow.toISOString().split('T')[0]);
+        setStartTime(pastBooking.start_time.slice(0, 5));
+        setHours(pastBooking.duration_hours);
+
+        setSelectedRoom(pastBooking.seat_label.includes('(') ? pastBooking.seat_label.split('(')[1].replace(')', '').trim() : '');
+        setSelectedSeat({
+            id: pastBooking.seat_id,
+            label: pastBooking.seat_label.split('(')[0].trim(),
+            type: 'desk',
+            basePrice: pastBooking.total_price / pastBooking.duration_hours // Приблизно
+        });
+        setBookingMode('seat');
     };
 
     const handleConfirmBooking = async () => {
-        if (!user) {
-            toast.warning("Будь ласка, увійдіть в акаунт, щоб забронювати місце.");
-            navigate('/login');
-            return;
-        }
-
+        if (!user) { toast.warning("Будь ласка, увійдіть в акаунт."); navigate('/login'); return; }
         try {
             const userId = user.user_id || user.id;
-
-            // Збираємо назви обраних додаткових послуг
-            const extrasLabels = selectedExtras.map(extId =>
-                EXTRA_SERVICES.find(e => e.id === extId).label
-            );
-
+            const extrasLabels = selectedExtras.map(extId => EXTRA_SERVICES.find(e => e.id === extId).label);
             const seatLabelRaw = selectedSeat ? (selectedSeat.label || selectedSeat.type) : selectedCategory.title;
-            const finalSeatLabel = selectedRoom ? `${seatLabelRaw} (${selectedRoom})` : seatLabelRaw;
+            const finalSeatLabel = (selectedRoom && !seatLabelRaw.includes('Кімната')) ? `${seatLabelRaw} (${selectedRoom})` : seatLabelRaw;
 
             const bookingData = {
                 user_id: userId,
                 seat_id: selectedSeat ? selectedSeat.id : selectedCategory.id,
                 seat_label: finalSeatLabel,
-                booking_date: date,
-                start_time: startTime,
-                duration_hours: hours,
-                total_price: totalAmount,
-                extras: extrasLabels
+                booking_date: date, start_time: startTime, duration_hours: hours,
+                total_price: totalAmount, extras: extrasLabels, extra_chairs: extraChairs
             };
-
-            const response = await axios.post('http://localhost:3005/api/bookings', bookingData);
-
-            if (response.status === 201) {
-                toast.success(`Бронювання успішне!`);
-                navigate('/user-page');
-            }
-        } catch (error) {
-            console.error("Помилка при бронюванні:", error);
-
-            // Якщо сервер повернув нашу конкретну помилку (наприклад, про зайнятий стіл)
-            if (error.response && error.response.data && error.response.data.error) {
-                toast.error(error.response.data.error);
-            } else {
-                // Якщо сервер впав або немає зв'язку
-                toast.error("Не вдалося створити бронювання. Спробуйте ще раз.");
-            }
-        }
+            await axios.post('/api/bookings', bookingData);
+            toast.success(`Бронювання успішне!`);
+            navigate('/user-page');
+        } catch (error) { toast.error(error.response?.data?.error || "Помилка бронювання."); }
     };
 
-    // Розрахунки
-    const basePrice = selectedSeat
-        ? SPACE_TYPES.find(t => t.id === selectedSeat.type)?.basePrice || 50
-        : selectedCategory.basePrice;
-
+    const basePrice = selectedSeat ? (selectedSeat.basePrice || SPACE_TYPES.find(t => t.id === selectedSeat.type)?.basePrice || 50) : selectedCategory.basePrice;
     const extrasTotal = selectedExtras.reduce((sum, extId) => sum + EXTRA_SERVICES.find(e => e.id === extId).price, 0);
     const totalAmount = (basePrice * hours) + extrasTotal;
 
     return (
         <div className="min-h-screen bg-[var(--day-pink)] dark:bg-[var(--night-dark-purple)] font-sans flex flex-col">
+            {/* Обов'язково додай onClick на логотип всередині MainPageHeader! */}
+
             <MainPageHeader
                 user={user} setIsOpen={setIsOpen} setUser={setUser} isOpen={isOpen} navigate={navigate}
                 isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleLogout={handleLogout}
+                handleResetToHome={handleResetToHome}
             />
 
             <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex flex-col lg:flex-row gap-8">
 
-                    {/* ЛІВА КОЛОНКА: ДИНАМІЧНА (Залежить від того, чи обрано місце) */}
+                {/* Показуємо плашку тільки на початковому екрані */}
+                {!selectedSeat && bookingMode === null && user && (
+                    <QuickBookingBanner user={user} onQuickBook={handleQuickBook} />
+                )}
+
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* ЛІВА КОЛОНКА */}
                     <div className="flex-1">
                         {!selectedSeat ? (
-                            /* КРОК 1: ВИБІР КАТЕГОРІЇ */
-                            <div className="animate-in fade-in slide-in-from-bottom-4">
-                                <span className="text-sm font-bold text-purple-600 tracking-wider uppercase mb-2 block">Крок 1 з 3</span>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Що вам потрібно сьогодні?</h1>
-                                <p className="text-gray-500 mb-8">Оберіть тип простору, а потім знайдіть ідеальне місце на карті.</p>
+                            <>
+                                {bookingMode === null && <ModeSelector setBookingMode={setBookingMode} />}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {SPACE_TYPES.map(type => (
-                                        <div
-                                            key={type.id}
-                                            onClick={() => setSelectedCategory(type)}
-                                            className={`p-6 rounded-2xl cursor-pointer transition-all border-2 ${selectedCategory.id === type.id ? 'border-purple-500 bg-purple-50 shadow-md transform scale-[1.02]' : 'border-transparent bg-white shadow-sm hover:shadow-md'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className={`p-3 rounded-xl ${selectedCategory.id === type.id ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                                                    {type.icon}
-                                                </div>
-                                                <div className={`text-2xl ${selectedCategory.id === type.id ? 'text-purple-500' : 'text-gray-300'}`}>
-                                                    {selectedCategory.id === type.id ? <FiCheckCircle /> : <FiCircle />}
-                                                </div>
-                                            </div>
-                                            <h3 className="font-bold text-lg text-gray-900 mb-1">{type.title}</h3>
-                                            <p className="text-sm text-gray-500 mb-4">{type.description}</p>
-                                            <div className="font-bold text-gray-900 bg-white inline-block px-3 py-1 rounded-full text-sm border">
-                                                від {type.basePrice} ₴ / год
-                                            </div>
+                                {bookingMode === 'room' && <RoomSelector onSelectRoom={handleRoomSelect} onBack={() => setBookingMode(null)} />}
+
+                                {bookingMode === 'seat' && (
+                                    <div className="animate-in fade-in slide-in-from-right-4">
+                                        <button onClick={() => setBookingMode(null)} className="text-sm font-bold text-gray-500 hover:text-purple-600 mb-4 flex items-center gap-2">
+                                            <FiArrowLeft /> Назад до вибору
+                                        </button>
+                                        <span className="text-sm font-bold text-purple-600 tracking-wider uppercase mb-2 block">Крок 1 з 3</span>
+                                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Оберіть тип місця</h1>
+                                        <p className="text-gray-500 mb-8">Оберіть тип простору, а потім знайдіть ідеальне місце на карті.</p>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {SPACE_TYPES.map(type => (
+                                                <ServiceCard
+                                                    key={type.id} type={type}
+                                                    isSelected={selectedCategory.id === type.id}
+                                                    onClick={() => setSelectedCategory(type)}
+                                                />
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
+                                    </div>
+                                )}
+                            </>
                         ) : (
-                            /* КРОК 3: НАЛАШТУВАННЯ ЧАСУ ТА ПОСЛУГ */
-                            <div className="animate-in fade-in slide-in-from-bottom-4">
-                                <span className="text-sm font-bold text-green-600 tracking-wider uppercase mb-2 block">Крок 3 з 3</span>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Налаштуйте бронювання</h1>
-                                <p className="text-gray-500 mb-8">Ви обрали <b className="text-gray-900">{selectedSeat.label || 'місце'}</b>. Вкажіть час та додаткові побажання.</p>
-
-                                {/* Вибір дати та часу */}
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FiClock /> Коли вас чекати?</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Дата</label>
-                                            <input
-                                                type="date"
-                                                value={date}
-                                                min={new Date().toISOString().split('T')[0]}
-                                                onChange={(e) => setDate(e.target.value)}
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Час початку</label>
-                                            <input
-                                                type="time"
-                                                value={startTime}
-                                                onChange={(e) => setStartTime(e.target.value)}
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Кількість годин</label>
-                                            <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl p-1">
-                                                <button onClick={() => setHours(Math.max(1, hours - 1))} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600">-</button>
-                                                <span className="flex-1 text-center font-bold">{hours} год.</span>
-                                                <button onClick={() => setHours(Math.min(12, hours + 1))} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600">+</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Додаткові послуги */}
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                                    <h3 className="font-bold text-gray-900 mb-4">Додати до бронювання</h3>
-                                    <div className="space-y-3">
-                                        {EXTRA_SERVICES.map(extra => (
-                                            <label key={extra.id} className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${selectedExtras.includes(extra.id) ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedExtras.includes(extra.id)}
-                                                        onChange={() => toggleExtra(extra.id)}
-                                                        className="w-5 h-5 text-purple-600 rounded cursor-pointer"
-                                                    />
-                                                    <div className="flex items-center gap-2 text-gray-700 font-medium">
-                                                        <span className="text-gray-400">{extra.icon}</span> {extra.label}
-                                                    </div>
-                                                </div>
-                                                <span className="font-bold text-gray-900">+{extra.price} ₴</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                            <BookingConfigurator
+                                date={date} setDate={setDate} startTime={startTime} setStartTime={setStartTime}
+                                hours={hours} setHours={setHours} extraChairs={extraChairs} setExtraChairs={setExtraChairs}
+                                selectedExtras={selectedExtras} toggleExtra={toggleExtra} EXTRA_SERVICES={EXTRA_SERVICES}
+                                selectedSeat={selectedSeat}
+                            />
                         )}
                     </div>
 
-                    {/* ПРАВА КОЛОНКА: САЙДБАР З ПІДСУМКАМИ */}
-                    <div className="lg:w-96">
-                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
-                            <h2 className="text-xl font-bold text-gray-800 mb-6">Ваше бронювання</h2>
-
-                            {!selectedSeat ? (
-                                /* САЙДБАР КРОКУ 1 */
-                                <>
-                                    <div className="bg-gray-50 p-4 rounded-xl mb-6">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">{selectedCategory.icon}</div>
-                                            <h3 className="font-bold text-gray-900">{selectedCategory.title}</h3>
-                                        </div>
-                                        <p className="text-sm text-gray-500">{selectedCategory.description}</p>
-                                    </div>
-                                    <button
-                                        onClick={handleGoToMap}
-                                        className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors shadow-lg shadow-purple-200"
-                                    >
-                                        Обрати на карті ➔
-                                    </button>
-                                </>
-                            ) : (
-                                /* САЙДБАР КРОКУ 3 */
-                                <>
-                                    <div className="mb-6 space-y-4">
-                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                <div className="flex items-center gap-2 text-gray-600">
-                                                    <FiMapPin className="text-purple-500" />
-                                                    <span>Обране місце</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="font-bold text-gray-900">{selectedSeat.label || 'Робоче місце'}</div>
-                                                    {selectedRoom && <div className="text-xs text-gray-500">{selectedRoom.replace(/_/g, ' ')}</div>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <FiCalendar className="text-purple-500" /> Дата
-                                            </div>
-                                            <span className="font-bold text-gray-900">{new Date(date).toLocaleDateString('uk-UA')}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="border-t border-gray-100 pt-4 mb-6 space-y-2 text-sm text-gray-600">
-                                        <div className="flex justify-between">
-                                            <span>Оренда ({hours} год. × {basePrice} ₴)</span>
-                                            <span className="font-medium">{basePrice * hours} ₴</span>
-                                        </div>
-                                        {selectedExtras.map(extId => {
-                                            const ext = EXTRA_SERVICES.find(e => e.id === extId);
-                                            return (
-                                                <div key={ext.id} className="flex justify-between text-gray-500">
-                                                    <span>{ext.label}</span>
-                                                    <span>{ext.price} ₴</span>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    <div className="border-t border-gray-200 pt-4 mb-6">
-                                        <div className="flex justify-between text-xl font-black text-gray-900">
-                                            <span>Всього</span>
-                                            <span className="text-purple-600">{totalAmount} ₴</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <button
-                                            onClick={handleConfirmBooking}
-                                            className="w-full py-4 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200"
-                                        >
-                                            Оплатити та забронювати
-                                        </button>
-                                        <button
-                                            onClick={handleCancelSeat}
-                                            className="w-full py-3 bg-white text-gray-500 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors"
-                                        >
-                                            Змінити місце
-                                        </button>
-                                    </div>
-                                </>
-                            )}
+                    {/* ПРАВА КОЛОНКА */}
+                    {bookingMode !== null && (
+                        <div className="lg:w-96 animate-in slide-in-from-right-8 fade-in">
+                            <OrderSummary
+                                selectedSeat={selectedSeat} selectedCategory={selectedCategory} selectedRoom={selectedRoom}
+                                date={date} hours={hours} basePrice={basePrice} totalAmount={totalAmount}
+                                selectedExtras={selectedExtras} EXTRA_SERVICES={EXTRA_SERVICES}
+                                handleGoToMap={handleGoToMap} handleConfirmBooking={handleConfirmBooking} handleCancelSeat={handleResetToHome}
+                            />
                         </div>
-                    </div>
+                    )}
                 </div>
             </main>
             <Footer />
         </div>
-
-    );
-
-}
-
-
-// Вставляємо цей компонент знизу файлу MainPage.jsx
-function Footer() {
-    return (
-        <footer className="bg-gray-900 text-gray-300 py-12 mt-20 border-t border-gray-800 w-full">
-            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div>
-                    <h3 className="text-white text-xl font-bold mb-4 tracking-wider flex items-center gap-2">
-                        <span className="text-purple-500">Time</span>Guard
-                    </h3>
-                    <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                        Сучасний простір для вашої продуктивності. Гнучкі робочі місця, комфортні переговорні кімнати та безперебійний інтернет для реалізації найсміливіших ідей.
-                    </p>
-                </div>
-                <div>
-                    <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Контакти</h4>
-                    <ul className="space-y-3 text-sm">
-                        <li className="flex items-start gap-3 hover:text-purple-400 transition">
-                            <FiMapPin className="mt-1 text-purple-500 shrink-0" />
-                            <span>вул. Незалежності, 42<br />м. Івано-Франківськ, 76000</span>
-                        </li>
-                        <li className="flex items-center gap-3 hover:text-purple-400 transition">
-                            <FiPhone className="text-purple-500 shrink-0" />
-                            <span>+38 (050) 123-45-67</span>
-                        </li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Графік роботи</h4>
-                    <ul className="space-y-3 text-sm">
-                        <li className="flex justify-between border-b border-gray-800 pb-2">
-                            <span>Пн - Пт</span><span className="font-medium text-white">08:00 - 22:00</span>
-                        </li>
-                        <li className="flex justify-between">
-                            <span>Сб - Нд</span><span className="font-medium text-purple-400">10:00 - 20:00</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </footer>
     );
 }
 

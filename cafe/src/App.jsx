@@ -13,7 +13,7 @@ import 'react-toastify/dist/ReactToastify.css';
 function App() {
   return (
     <div className="font-sans text-gray-900 antialiased">
-      {/* 2. Додаємо контейнер на рівні всього додатку */}
+      {/* контейнер на рівні всього додатку */}
       <ToastContainer
         position="bottom-right"
         autoClose={3000}
@@ -24,7 +24,7 @@ function App() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="light" // Можна зробити 'colored' або 'dark'
+        theme="light"
       />
 
       <Router>
